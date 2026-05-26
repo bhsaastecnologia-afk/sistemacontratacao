@@ -250,6 +250,7 @@ img { max-width: 100%; }
   box-shadow: 0 0 0 3px rgba(0,180,216,.12);
 }
 .field input.error-field { border-color: var(--error); }
+.field select.error-field { border-color: var(--error); }
 .field input[readonly] { background: var(--gray50); color: var(--gray500); }
 
 /* ── Buttons ── */
@@ -877,6 +878,24 @@ tbody tr:hover td { background: var(--gray50); }
 /* ── Classes utilitárias faltantes ── */
 /* form-container: wrapper das etapas do candidato */
 .form-container { max-width: 640px; margin: 0 auto; padding: 22px 16px; }
+
+/* ── Uppercase para campos de texto do candidato ── */
+#page-candidato .field input[type="text"],
+#page-candidato .field input[type="tel"],
+#page-candidato .field input[type="email"] {
+  text-transform: uppercase;
+}
+#page-candidato .field input[type="text"]::placeholder,
+#page-candidato .field input[type="tel"]::placeholder,
+#page-candidato .field input[type="email"]::placeholder {
+  text-transform: none;
+}
+/* Exceções que não devem ser uppercase */
+#page-candidato .field input[type="date"],
+#page-candidato .field input[type="number"],
+#page-candidato #e2-email {
+  text-transform: none !important;
+}
 .chip {
   display: inline-flex; align-items: center;
   padding: 2px 6px; border-radius: 99px;
@@ -1257,6 +1276,15 @@ function validarCPF(cpf) {
   return r === parseInt(c[10])
 }
 
+// Pegar valor de input e converter para maiúsculo
+function uval(id) {
+  const el = document.getElementById(id)
+  if (!el) return ''
+  const v = el.value.trim()
+  if (el.type === 'email' || el.type === 'date' || el.tagName === 'SELECT') return v
+  return v.toUpperCase()
+}
+
 function applyMask(el, type) {
   const masks = {
     cpf: v => v.replace(/\D/g,'').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2').slice(0,14),
@@ -1288,6 +1316,96 @@ function statusBadge(status) {
 function gerarProtocolo() {
   const d = new Date()
   return `RCT-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${Math.floor(Math.random()*90000+10000)}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// SISTEMA DE NOTIFICAÇÕES EM TEMPO REAL
+// ════════════════════════════════════════════════════════════════
+
+let _notifLastCheck = new Date().toISOString()
+let _notifInterval = null
+let _notifVistas = new Set()
+
+async function iniciarNotificacoes() {
+  if (_notifInterval) return
+  await checarNotificacoes()
+  _notifInterval = setInterval(checarNotificacoes, 30000) // a cada 30s
+}
+
+async function checarNotificacoes() {
+  try {
+    // Buscar colaboradores atualizados desde o último check
+    const { data: atualizados } = await sb.from('colaboradores')
+      .select('id, etapa_atual, updated_at, convite_id, nome_completo, convites(candidato_nome, status, id)')
+      .gt('updated_at', _notifLastCheck)
+
+    _notifLastCheck = new Date().toISOString()
+
+    if (!atualizados || atualizados.length === 0) return
+
+    atualizados.forEach(c => {
+      const convite = c.convites
+      if (!convite) return
+      const key = `${convite.id}-${c.etapa_atual}-${convite.status}`
+      if (_notifVistas.has(key)) return
+      _notifVistas.add(key)
+
+      const nome = c.nome_completo || convite.candidato_nome
+      const etapa = c.etapa_atual
+
+      let msg = ''
+      if (convite.status === 'em_analise') msg = `✅ ${nome} finalizou e enviou todos os documentos`
+      else if (etapa === 1) msg = `🟢 ${nome} iniciou o preenchimento`
+      else if (etapa >= 2 && etapa < 8) msg = `📝 ${nome} avançou para a etapa ${etapa} de 8`
+
+      if (msg) {
+        mostrarNotifBanner(msg, convite.id)
+        atualizarBadgeNotif()
+      }
+    })
+
+    loadDashboardBadge()
+  } catch(e) { /* silencioso */ }
+}
+
+let _notifCount = 0
+function atualizarBadgeNotif() {
+  _notifCount++
+  let badge = document.getElementById('badge-notif')
+  if (!badge) {
+    const topRight = document.querySelector('.topbar-right')
+    if (!topRight) return
+    badge = document.createElement('button')
+    badge.id = 'badge-notif'
+    badge.className = 'btn btn-sm'
+    badge.style.cssText = 'background:var(--error);color:white;border:none;border-radius:99px;min-width:28px;padding:4px 8px;font-size:12px;font-weight:700;cursor:pointer;'
+    badge.title = 'Notificações'
+    badge.onclick = () => { _notifCount = 0; badge.style.display = 'none'; navigateTo('admissoes') }
+    topRight.insertBefore(badge, topRight.firstChild)
+  }
+  badge.style.display = 'inline-flex'
+  badge.textContent = `🔔 ${_notifCount}`
+}
+
+let _notifBannerTimer = null
+function mostrarNotifBanner(msg, conviteId) {
+  let banner = document.getElementById('notif-banner')
+  if (!banner) {
+    banner = document.createElement('div')
+    banner.id = 'notif-banner'
+    banner.style.cssText = `position:fixed;top:70px;right:20px;z-index:7000;background:var(--navy);color:white;border-left:4px solid var(--teal);padding:12px 16px;border-radius:var(--radius);box-shadow:var(--shadow-lg);max-width:320px;cursor:pointer;font-size:13px;font-weight:500;display:flex;align-items:center;gap:10px;transition:all .3s;`
+    document.body.appendChild(banner)
+  }
+  banner.innerHTML = `<span>${msg}</span><span style="margin-left:auto;opacity:.5;font-size:11px;">agora</span>`
+  banner.onclick = () => { banner.style.opacity = '0'; abrirDetalheAdmissao(conviteId).catch(()=>{}) }
+  banner.style.opacity = '1'
+  banner.style.transform = 'translateX(0)'
+
+  if (_notifBannerTimer) clearTimeout(_notifBannerTimer)
+  _notifBannerTimer = setTimeout(() => {
+    banner.style.opacity = '0'
+    banner.style.transform = 'translateX(20px)'
+  }, 6000)
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1401,6 +1519,8 @@ document.getElementById('btn-reset').addEventListener('click', async () => {
 })
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
+  // Parar poll de notificações antes de sair
+  if (_notifInterval) { clearInterval(_notifInterval); _notifInterval = null }
   await sb.auth.signOut()
   APP.user = null; APP.profile = null
   showPage('page-login')
@@ -1455,6 +1575,7 @@ function navigateTo(page) {
 function initAdmin() {
   navigateTo('dashboard')
   loadDashboardBadge()
+  iniciarNotificacoes()
 }
 
 async function loadDashboardBadge() {
@@ -1506,53 +1627,76 @@ async function renderDashboard() {
 
     // Últimas admissões
     const { data: recentes } = await sb.from('convites')
-      .select('*, colaboradores(etapa_atual)')
+      .select('*, colaboradores(etapa_atual, updated_at)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(8)
 
+    // Alertas — em andamento há mais de 3 dias sem avançar
+    const { data: emAndamento } = await sb.from('convites')
+      .select('id, candidato_nome, created_at, colaboradores(etapa_atual, updated_at)')
+      .eq('status', 'em_andamento')
+      .is('deleted_at', null)
+
+    const alertas = (emAndamento || []).filter(c => {
+      const upd = c.colaboradores?.updated_at
+      if (!upd) return true // nunca atualizou
+      const diasSemAtividade = (Date.now() - new Date(upd)) / (1000 * 60 * 60 * 24)
+      return diasSemAtividade > 2
+    })
+
+    const alertasHtml = alertas.length > 0 ? `
+    <div class="card" style="border-left:4px solid var(--warn);">
+      <div class="card-header" style="padding-bottom:8px;">
+        <h3 style="color:var(--warn);">⚠️ Alertas (${alertas.length})</h3>
+      </div>
+      <div class="card-body" style="padding-top:0;">
+        ${alertas.map(c => {
+          const etapa = c.colaboradores?.etapa_atual || 0
+          const upd = c.colaboradores?.updated_at
+          const dias = upd ? Math.floor((Date.now() - new Date(upd)) / (1000*60*60*24)) : null
+          return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--gray100);flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-weight:600;color:var(--navy);font-size:13px;">${c.candidato_nome}</div>
+              <div style="font-size:11px;color:var(--gray500);">Etapa ${etapa}/8 ${dias !== null ? `— sem atividade há ${dias} dia(s)` : '— nunca acessou'}</div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="abrirDetalheAdmissao('${c.id}').catch(console.error)">Ver</button>
+          </div>`
+        }).join('')}
+      </div>
+    </div>` : ''
+
     main.innerHTML = `
     <div class="slide-up">
+      ${alertasHtml}
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--teal-xl);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
+          <div class="stat-icon" style="background:var(--teal-xl);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
           <div class="stat-number" style="color:var(--navy);">${stats.hoje}</div>
           <div class="stat-label">Criados Hoje</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--warn-l);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
+          <div class="stat-icon" style="background:var(--warn-l);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           <div class="stat-number" style="color:var(--warn);">${stats.pendentes}</div>
           <div class="stat-label">Pendentes</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--teal-xl);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          </div>
+          <div class="stat-icon" style="background:var(--teal-xl);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
           <div class="stat-number" style="color:var(--teal-d);">${stats.andamento}</div>
           <div class="stat-label">Em Andamento</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--success-l);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
+          <div class="stat-icon" style="background:var(--success-l);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
           <div class="stat-number" style="color:var(--success);">${stats.completas}</div>
           <div class="stat-label">Completas</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FFF3CD;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
+          <div class="stat-icon" style="background:#FFF3CD;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/></svg></div>
           <div class="stat-number" style="color:#D97706;">${stats.incompletas}</div>
           <div class="stat-label">Doc. Incompleta</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--gray100);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/><path d="M16.24 7.76l-1.42 1.42"/></svg>
-          </div>
+          <div class="stat-icon" style="background:var(--gray100);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg></div>
           <div class="stat-number" style="color:var(--gray500);">${stats.expirados}</div>
           <div class="stat-label">Expirados</div>
         </div>
@@ -1599,7 +1743,7 @@ async function renderDashboard() {
                     <button class="btn btn-ghost btn-sm" onclick="abrirDetalheAdmissao('${c.id}').catch(console.error)">Ver</button>
                   </td>
                 </tr>
-              `).join('') || '<tr><td colspan="7"><div class="empty-state" style="padding:24px"><div class="e-icon">📭</div><div class="empty-title">Nenhuma admissão ainda</div><p class="empty-desc">Crie o primeiro convite clicando em "Novo Convite".</p></div></td></tr>'}
+              `).join('') || '<tr><td colspan="7"><div class="empty-state" style="padding:24px"><div class="e-icon">📭</div><div class="empty-title">Nenhuma admissão ainda</div></div></td></tr>'}
             </tbody>
           </table>
         </div>
@@ -1708,6 +1852,7 @@ async function loadAdmissoesTable() {
               <div style="display:flex;gap:4px;">
                 <button class="btn btn-outline btn-sm" onclick="abrirDetalheAdmissao('${c.id}').catch(console.error)">Ver</button>
                 <button class="btn btn-ghost btn-sm" onclick="copiarLink('${c.token}')" title="Copiar link">🔗</button>
+                <button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:none;" onclick="confirmarExcluirConvite('${c.id}', '${c.candidato_nome.replace(/'/g,"\\'")}')">🗑</button>
               </div>
             </td>
           </tr>`
@@ -1723,7 +1868,7 @@ async function loadAdmissoesTable() {
     }
     document.getElementById('adm-pagination').innerHTML = pagHtml
   } catch(e) {
-    wrap.innerHTML = `<div class="empty-state"><h3>Erro ao carregar</div><p class="empty-desc">${e.message}</p></div>`
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Erro ao carregar</div><p class="empty-desc">${e.message}</p></div>`
   }
 }
 
@@ -1958,7 +2103,7 @@ async function abrirDetalheAdmissao(id) {
       ${colab ? renderDadosColab(colab) : '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Candidato ainda não preencheu os dados</div></div>'}
     </div>
     <div id="tab-content-documentos" class="tab-content hidden">
-      ${renderDocumentosColab(colab?.documentos||[])}
+      ${renderDocumentosColab(colab?.documentos||[], colab?.nome_completo || convite.candidato_nome)}
     </div>
     <div id="tab-content-timeline" class="tab-content hidden">
       <div class="timeline">
@@ -2031,6 +2176,15 @@ function renderDadosColab(c) {
         ${S(addrParts.join(', '))}${cityPart ? ' — ' + S(cityPart) : ''}${c.cep ? ' | CEP ' + c.cep : ''}
       </div>
     </div>
+    <div class="section-label">Dados Trabalhistas</div>
+    <div class="dados-grid" style="margin-bottom:16px;">
+      <div class="dado-item"><div class="dado-label">PIS/PASEP</div><div class="dado-val">${S(c.pis)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">CTPS</div><div class="dado-val">${c.ctps_numero ? S(c.ctps_numero) + (c.ctps_serie ? ' / Série ' + S(c.ctps_serie) : '') : '—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Título Eleitor</div><div class="dado-val">${S(c.titulo_eleitor)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Zona / Seção</div><div class="dado-val">${c.titulo_zona ? S(c.titulo_zona) + (c.titulo_secao ? ' / ' + S(c.titulo_secao) : '') : '—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Cidade/UF Título</div><div class="dado-val">${c.titulo_cidade ? S(c.titulo_cidade) + (c.titulo_estado ? '/' + S(c.titulo_estado) : '') : '—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Reservista</div><div class="dado-val">${S(c.reservista)||'—'}</div></div>
+    </div>
     <div class="section-label">Dados Bancários</div>
     <div class="dados-grid" style="margin-bottom:16px;">
       <div class="dado-item"><div class="dado-label">Banco</div><div class="dado-val">${S(c.banco_nome)||'—'}</div></div>
@@ -2043,31 +2197,66 @@ function renderDadosColab(c) {
 }
 
 
-function renderDocumentosColab(docs) {
+function renderDocumentosColab(docs, nomeColab) {
+  // Lista completa REALTEC — espelha DOC_TIPOS do formulário do candidato
   const tipos = [
-    { key:'rg', label:'RG' }, { key:'cpf', label:'CPF' }, { key:'ctps', label:'CTPS' },
-    { key:'titulo_eleitor', label:'Título Eleitor' }, { key:'reservista', label:'Reservista' },
-    { key:'comp_residencia', label:'Comp. Residência' }, { key:'cartao_banco', label:'Cartão Banco' },
-    { key:'foto_3x4', label:'Foto 3x4' },
+    { key:'qualificacao_cef',  label:'Qualif. Cadastral CEF' },
+    { key:'ctps',              label:'CTPS' },
+    { key:'rg',                label:'RG' },
+    { key:'cpf',               label:'CPF' },
+    { key:'pis',               label:'PIS' },
+    { key:'titulo_eleitor',    label:'Título Eleitor' },
+    { key:'reservista',        label:'Reservista' },
+    { key:'cnh',               label:'CNH' },
+    { key:'decl_escolaridade', label:'Decl. Escolaridade' },
+    { key:'cert_casamento',    label:'Cert. Casamento/União' },
+    { key:'cert_nascimento',   label:'Cert. Nascimento' },
+    { key:'comp_residencia',   label:'Comp. Residência' },
+    { key:'cartao_sus',        label:'Cartão SUS + Vacina' },
+    { key:'cartao_banco',      label:'Cartão Banco Itaú' },
+    { key:'foto_3x4',          label:'Fotos 3×4' },
+    { key:'cert_senai_nr10',   label:'SENAI/NR10 (Eletricista)' },
+    { key:'cert_solda',        label:'Cert. Solda (Soldador)' },
+    { key:'vacina_hepatite_b', label:'Hep.B (Eletricista)' },
+    { key:'cartao_sus_dep',    label:'SUS Dependente' },
+    { key:'rg_dep',            label:'RG Dependente' },
+    { key:'cpf_dep',           label:'CPF Dependente' },
+    { key:'cart_vacina_dep',   label:'Carteira Vacina Dep.' },
   ]
   const docMap = {}
   docs.forEach(d => { docMap[d.tipo] = d })
+
+  const nome = nomeColab || 'Colaborador'
+
   return `
+  <div style="margin-bottom:10px;display:flex;justify-content:flex-end;">
+    ${docs.length > 0 ? `<button class="btn btn-outline btn-sm" onclick="baixarTodosDocumentos('${nome.replace(/'/g,"\\'")}')">⬇ Baixar Todos (${docs.length})</button>` : ''}
+  </div>
   <div class="doc-checklist">
     ${tipos.map(t => {
       const doc = docMap[t.key]
+      if (!doc && !['rg','cpf','ctps','comp_residencia','cartao_banco'].includes(t.key)) {
+        // Mostrar só os opcionais que foram enviados
+      }
       const cls = doc ? (doc.status === 'aprovado' ? 'done' : doc.status === 'reprovado' ? 'error' : '') : 'error'
       const icon = doc ? (doc.status === 'aprovado' ? '✓' : doc.status === 'reprovado' ? '✗' : '⏳') : '✗'
       return `<div class="doc-item ${cls}">
         <span class="doc-check">${icon}</span>
-        <div>
-          <div style="font-weight:600;">${t.label}</div>
-          ${doc ? `<div style="font-size:10px;margin-top:1px;">${doc.status} ${doc.motivo_reprovacao?'— '+doc.motivo_reprovacao:''}</div>` : '<div style="font-size:10px;">Não enviado</div>'}
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:600;font-size:12px;">${t.label}</div>
+          ${doc
+            ? `<div style="font-size:10px;color:var(--gray500);margin-top:1px;">${doc.status}${doc.motivo_reprovacao?' — '+doc.motivo_reprovacao:''}</div>`
+            : '<div style="font-size:10px;color:var(--gray400);">Não enviado</div>'}
+          ${doc?.storage_path ? `
+          <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;">
+            <button class="btn btn-sm" style="padding:2px 7px;font-size:10px;background:var(--teal-xl);color:var(--teal-d);border:none;" onclick="previewDoc('${doc.storage_path}')">👁 Ver</button>
+            <button class="btn btn-sm" style="padding:2px 7px;font-size:10px;background:var(--gray100);color:var(--gray700);border:none;" onclick="baixarDoc('${doc.storage_path}','${nome.replace(/'/g,"\\'")}','${t.label}','${doc.mime_type||'image/jpeg'}')">⬇ Baixar</button>
+          </div>` : ''}
         </div>
         ${doc && doc.status === 'pendente' ? `
-          <div style="margin-left:auto;display:flex;gap:4px;">
-            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:var(--success-l);color:#22543D;border:none;" onclick="aprovarDoc('${doc.id}')">✓</button>
-            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${doc.id}')">✗</button>
+          <div style="display:flex;gap:4px;flex-direction:column;">
+            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:var(--success-l);color:#22543D;border:none;" onclick="aprovarDoc('${doc.id}')">✓ Aprovar</button>
+            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${doc.id}')">✗ Reprovar</button>
           </div>` : ''}
       </div>`
     }).join('')}
@@ -2088,6 +2277,14 @@ async function excluirConvite(id) {
   closeModal('modal-detalhe')
   renderAdmissoes()
   toast('Convite excluído.', 'info')
+}
+
+function confirmarExcluirConvite(id, nome) {
+  if (confirm(`Excluir o cadastro de "${nome}"?\n\nEsta ação não pode ser desfeita.`)) {
+    sb.from('convites').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+      .then(() => { toast('Cadastro excluído.', 'info'); loadAdmissoesTable() })
+      .catch(e => toast('Erro ao excluir: ' + e.message, 'error'))
+  }
 }
 
 async function aprovarDoc(docId) {
@@ -2138,86 +2335,187 @@ async function renderExportacao() {
   <div class="slide-up" style="max-width:100%;">
     <div class="card">
       <div class="card-header">
-        <h3>Exportação Star Soft</h3>
+        <h3>Exportação de Dados</h3>
       </div>
       <div class="card-body">
-        <p style="font-size:14px;color:var(--gray600);margin-bottom:20px;">Exporte os dados admissionais em formato compatível com o sistema Star Soft.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
-          <div class="stat-card" style="cursor:default;">
-            <div class="stat-icon" style="background:var(--teal-xl);">📊</div>
-            <div style="font-size:13px;font-weight:600;color:var(--navy);">Colaboradores</div>
-            <div style="font-size:12px;color:var(--gray500);">Dados pessoais, trabalhistas, bancários</div>
-          </div>
-          <div class="stat-card" style="cursor:default;">
-            <div class="stat-icon" style="background:var(--success-l);">👶</div>
-            <div style="font-size:13px;font-weight:600;color:var(--navy);">Dependentes</div>
-            <div style="font-size:12px;color:var(--gray500);">Todos os dependentes cadastrados</div>
-          </div>
+        <p style="font-size:14px;color:var(--gray600);margin-bottom:20px;">Exporte os dados admissionais em XLSX, CSV ou XML (Star Soft).</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+          <div class="stat-card" style="cursor:default;"><div class="stat-icon" style="background:var(--teal-xl);">📊</div><div style="font-size:13px;font-weight:600;color:var(--navy);">Colaboradores</div><div style="font-size:12px;color:var(--gray500);">Dados pessoais, trabalhistas, bancários</div></div>
+          <div class="stat-card" style="cursor:default;"><div class="stat-icon" style="background:var(--success-l);">👶</div><div style="font-size:13px;font-weight:600;color:var(--navy);">Dependentes</div><div style="font-size:12px;color:var(--gray500);">Todos os dependentes cadastrados</div></div>
+          <div class="stat-card" style="cursor:default;"><div class="stat-icon" style="background:var(--purple-l);">🗂</div><div style="font-size:13px;font-weight:600;color:var(--navy);">Documentos</div><div style="font-size:12px;color:var(--gray500);">Baixar arquivos ZIP por colaborador</div></div>
         </div>
 
-        <div class="field">
-          <label>Filtrar por Status</label>
-          <select id="export-status">
-            <option value="">Todos</option>
-            <option value="aprovada">Aprovados</option>
-            <option value="admitido">Admitidos</option>
-            <option value="completa">Completos</option>
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Período</label>
-          <div class="input-group">
-            <input type="date" id="export-de" placeholder="De">
-            <input type="date" id="export-ate" placeholder="Até">
+        <div class="input-group">
+          <div class="field">
+            <label>Filtrar por Status</label>
+            <select id="export-status">
+              <option value="">Todos</option>
+              <option value="aprovada">Aprovados</option>
+              <option value="admitido">Admitidos</option>
+              <option value="completa">Completos</option>
+              <option value="em_analise">Em Análise</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>De</label>
+            <input type="date" id="export-de">
+          </div>
+          <div class="field">
+            <label>Até</label>
+            <input type="date" id="export-ate">
           </div>
         </div>
 
         <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
-          <button class="btn btn-primary btn-lg" id="btn-export-xlsx" onclick="executarExport('xlsx')">
-            📊 Exportar XLSX
-          </button>
-          <button class="btn btn-outline btn-lg" id="btn-export-csv" onclick="executarExport('csv')">
-            📄 Exportar CSV
-          </button>
+          <button class="btn btn-primary btn-lg" id="btn-export-xlsx" onclick="executarExport('xlsx')">📊 Exportar XLSX</button>
+          <button class="btn btn-outline btn-lg" id="btn-export-csv" onclick="executarExport('csv')">📄 Exportar CSV</button>
+          <button class="btn btn-lg" style="background:var(--purple-l);color:var(--purple);border:none;" id="btn-export-xml" onclick="executarExport('xml')">🗃 Exportar XML</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="section-label">📁 Download de Documentos</div>
+        <p style="font-size:13px;color:var(--gray600);margin-bottom:12px;">Baixe todos os documentos enviados. Os arquivos serão nomeados como <b>NOME COMPLETO - TIPO DOCUMENTO.ext</b> para organização em pasta de rede.</p>
+        <div id="doc-download-list">
+          <div style="padding:20px;text-align:center;"><div class="load-ring" style="margin:0 auto;border-top-color:var(--navy);"></div></div>
         </div>
       </div>
     </div>
   </div>`
+
+  await carregarListaDocumentos()
+}
+
+async function carregarListaDocumentos() {
+  const wrap = document.getElementById('doc-download-list')
+  if (!wrap) return
+  try {
+    const { data: docs } = await sb.from('documentos')
+      .select('*, colaboradores(nome_completo)')
+      .not('storage_path', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (!docs || docs.length === 0) {
+      wrap.innerHTML = '<div style="font-size:13px;color:var(--gray500);padding:12px 0;">Nenhum documento enviado ainda.</div>'
+      return
+    }
+
+    // Agrupar por colaborador
+    const byColab = {}
+    docs.forEach(d => {
+      const nome = d.colaboradores?.nome_completo || 'Desconhecido'
+      if (!byColab[nome]) byColab[nome] = []
+      byColab[nome].push(d)
+    })
+
+    const tipoLabel = {
+      qualificacao_cef:'Qualif.CEF', ctps:'CTPS', rg:'RG', cpf:'CPF', pis:'PIS',
+      titulo_eleitor:'Título Eleitor', reservista:'Reservista', cnh:'CNH',
+      decl_escolaridade:'Decl.Escolaridade', cert_casamento:'Cert.Casamento',
+      cert_nascimento:'Cert.Nascimento', comp_residencia:'Comp.Residência',
+      cartao_sus:'Cartão SUS', cartao_banco:'Cartão Banco Itaú', foto_3x4:'Fotos 3x4',
+      cert_senai_nr10:'SENAI NR10', cert_solda:'Cert.Solda', vacina_hepatite_b:'Hep.B',
+      cartao_sus_dep:'SUS Dep.', rg_dep:'RG Dep.', cpf_dep:'CPF Dep.', cart_vacina_dep:'Vacina Dep.',
+    }
+
+    wrap.innerHTML = Object.entries(byColab).map(([nome, docList]) => `
+    <div style="border:1px solid var(--gray200);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;background:white;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+        <div style="font-weight:700;color:var(--navy);font-size:14px;">👤 ${nome}</div>
+        <button class="btn btn-outline btn-sm" onclick="baixarTodosDocumentos('${nome.replace(/'/g,"\\'")}')">⬇ Baixar Todos (${docList.length})</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${docList.map(d => `
+          <button class="btn btn-sm" style="background:var(--teal-xl);color:var(--teal-d);border:none;font-size:11px;"
+            onclick="baixarDoc('${d.storage_path}','${nome.replace(/'/g,"\\'")}','${tipoLabel[d.tipo]||d.tipo}','${d.mime_type}')">
+            ${d.mime_type === 'application/pdf' ? '📄' : '🖼'} ${tipoLabel[d.tipo] || d.tipo}
+          </button>`).join('')}
+      </div>
+    </div>`).join('')
+  } catch(e) {
+    wrap.innerHTML = `<div style="color:var(--error);font-size:13px;">Erro ao carregar: ${e.message}</div>`
+  }
+}
+
+async function baixarDoc(storagePath, nomeColab, tipoDoc, mimeType) {
+  try {
+    toast('Preparando download...', 'info')
+    const { data, error } = await sb.storage.from('admissoes').download(storagePath)
+    if (error) throw error
+    const ext = mimeType === 'application/pdf' ? 'pdf' : (mimeType.includes('png') ? 'png' : 'jpg')
+    const nomeArquivo = `${nomeColab} - ${tipoDoc}.${ext}`
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a'); a.href = url; a.download = nomeArquivo; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    toast(`Download iniciado: ${nomeArquivo}`, 'success')
+  } catch(e) { toast('Erro no download: ' + e.message, 'error') }
+}
+
+async function baixarTodosDocumentos(nomeColab) {
+  toast('Baixando documentos de ' + nomeColab + '...', 'info')
+  try {
+    const { data: docs } = await sb.from('documentos')
+      .select('*, colaboradores(nome_completo)')
+      .eq('colaboradores.nome_completo', nomeColab)
+      .not('storage_path', 'is', null)
+
+    const tipoLabel = {
+      qualificacao_cef:'Qualif.CEF', ctps:'CTPS', rg:'RG', cpf:'CPF', pis:'PIS',
+      titulo_eleitor:'Título Eleitor', reservista:'Reservista', cnh:'CNH',
+      decl_escolaridade:'Decl.Escolaridade', cert_casamento:'Cert.Casamento',
+      cert_nascimento:'Cert.Nascimento', comp_residencia:'Comp.Residência',
+      cartao_sus:'Cartão SUS', cartao_banco:'Cartão Banco Itaú', foto_3x4:'Fotos 3x4',
+      cert_senai_nr10:'SENAI NR10', cert_solda:'Cert.Solda', vacina_hepatite_b:'Hep.B',
+      cartao_sus_dep:'SUS Dep.', rg_dep:'RG Dep.', cpf_dep:'CPF Dep.', cart_vacina_dep:'Vacina Dep.',
+    }
+
+    for (const d of (docs || [])) {
+      await baixarDoc(d.storage_path, nomeColab, tipoLabel[d.tipo] || d.tipo, d.mime_type)
+      await new Promise(r => setTimeout(r, 600)) // intervalo entre downloads
+    }
+  } catch(e) { toast('Erro: ' + e.message, 'error') }
 }
 
 async function executarExport(tipo) {
-  const btn = document.getElementById(`btn-export-${tipo}`)
-  btn.disabled = true; btn.textContent = 'Exportando...'
+  const btnId = tipo === 'xml' ? 'btn-export-xml' : `btn-export-${tipo}`
+  const btn = document.getElementById(btnId)
+  if (btn) { btn.disabled = true; btn.textContent = 'Exportando...' }
   try {
-    let query = sb.from('colaboradores').select('*, convites(*), dependentes(*), documentos(tipo,status)').is('deleted_at',null)
+    let query = sb.from('colaboradores').select('*, convites(*), dependentes(*), documentos(tipo,status)')
     const status = document.getElementById('export-status')?.value
     if (status) query = query.eq('convites.status', status)
+    const de = document.getElementById('export-de')?.value
+    const ate = document.getElementById('export-ate')?.value
+    if (de) query = query.gte('created_at', de)
+    if (ate) query = query.lte('created_at', ate + 'T23:59:59')
     const { data, error } = await query
     if (error) throw error
 
-    if (tipo === 'xlsx') {
-      gerarXLSX(data)
-    } else {
-      gerarCSV(data)
-    }
-    toast(`Exportação ${tipo.toUpperCase()} concluída!`, 'success')
+    if (tipo === 'xlsx') gerarXLSX(data)
+    else if (tipo === 'csv') gerarCSV(data)
+    else if (tipo === 'xml') gerarXML(data)
+    toast(`Exportação ${tipo.toUpperCase()} concluída! (${data.length} registros)`, 'success')
   } catch(e) {
     toast('Erro na exportação: ' + e.message, 'error')
   } finally {
-    btn.disabled = false
-    btn.textContent = tipo === 'xlsx' ? '📊 Exportar XLSX' : '📄 Exportar CSV'
+    if (btn) {
+      btn.disabled = false
+      if (tipo === 'xlsx') btn.textContent = '📊 Exportar XLSX'
+      else if (tipo === 'csv') btn.textContent = '📄 Exportar CSV'
+      else btn.textContent = '🗃 Exportar XML'
+    }
   }
 }
 
 function gerarXLSX(data) {
   if (typeof XLSX === 'undefined') { toast('SheetJS não disponível.', 'error'); return }
   const wb = XLSX.utils.book_new()
-  const headers = ['NOME','CPF','RG','SEXO','ESTADO_CIVIL','NASCIMENTO','MAE','PAI','TELEFONE','WHATSAPP','EMAIL','CEP','LOGRADOURO','NUMERO','COMPLEMENTO','BAIRRO','CIDADE','UF','PIS','CTPS','SERIE_CTPS','FUNCAO','SALARIO','OBRA','ADMISSAO','BANCO_COD','BANCO_NOME','AGENCIA','CONTA','TIPO_CONTA','NACIONALIDADE']
+  const headers = ['NOME','CPF','RG','SEXO','ESTADO_CIVIL','NASCIMENTO','MAE','PAI','TELEFONE','WHATSAPP','EMAIL','CEP','LOGRADOURO','NUMERO','COMPLEMENTO','BAIRRO','CIDADE','UF','PIS','CTPS','SERIE_CTPS','TITULO_ELEITOR','TITULO_ZONA','TITULO_SECAO','TITULO_CIDADE','TITULO_ESTADO','RESERVISTA','FUNCAO','SALARIO','OBRA','ADMISSAO','BANCO_COD','BANCO_NOME','AGENCIA','CONTA','TIPO_CONTA','NACIONALIDADE']
   const rows = data.map(c => [
     c.nome_completo, c.cpf, c.rg, c.sexo, c.estado_civil, c.data_nascimento,
     c.nome_mae, c.nome_pai, c.telefone, c.whatsapp, c.email, c.cep, c.logradouro, c.numero, c.complemento, c.bairro, c.cidade, c.estado,
-    c.pis, c.ctps_numero, c.ctps_serie, c.convites?.funcao, c.convites?.salario, c.convites?.obra_unidade,
+    c.pis, c.ctps_numero, c.ctps_serie, c.titulo_eleitor, c.titulo_zona, c.titulo_secao, c.titulo_cidade, c.titulo_estado, c.reservista,
+    c.convites?.funcao, c.convites?.salario, c.convites?.obra_unidade,
     c.convites?.data_admissao_prevista, c.banco_codigo, c.banco_nome, c.agencia, c.conta, c.conta_tipo, c.nacionalidade,
   ])
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
@@ -2225,6 +2523,16 @@ function gerarXLSX(data) {
   XLSX.utils.book_append_sheet(wb, ws, 'COLABORADORES')
 
   // Dependentes
+  // Aba de status dos documentos
+  const docStatusHeaders = ['COLABORADOR','CPF','DOCUMENTO','STATUS','ENVIADO_EM']
+  const docStatusRows = data.flatMap(c => (c.documentos||[]).map(d => [
+    c.nome_completo, c.cpf, d.tipo?.replace(/_/g,' ').toUpperCase(), d.status, d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : ''
+  ]))
+  if (docStatusRows.length > 0) {
+    const wsDocStatus = XLSX.utils.aoa_to_sheet([docStatusHeaders, ...docStatusRows])
+    XLSX.utils.book_append_sheet(wb, wsDocStatus, 'STATUS_DOCS')
+  }
+
   const depHeaders = ['COLABORADOR','CPF_COL','NOME_DEP','CPF_DEP','RG_DEP','NASC_DEP','PARENTESCO']
   const depRows = data.flatMap(c => (c.dependentes||[]).map(d => [
     c.nome_completo, c.cpf, d.nome, d.cpf, d.rg, d.data_nascimento, d.parentesco
@@ -2238,9 +2546,10 @@ function gerarXLSX(data) {
 }
 
 function gerarCSV(data) {
-  const headers = ['NOME','CPF','RG','TELEFONE','EMAIL','CEP','CIDADE','UF','FUNCAO','SALARIO','ADMISSAO']
+  const headers = ['NOME','CPF','RG','TELEFONE','EMAIL','CEP','CIDADE','UF','TITULO_ELEITOR','TITULO_CIDADE','TITULO_ESTADO','FUNCAO','SALARIO','ADMISSAO']
   const rows = [headers, ...data.map(c => [
     c.nome_completo, c.cpf, c.rg, c.telefone, c.email, c.cep, c.cidade, c.estado,
+    c.titulo_eleitor, c.titulo_cidade, c.titulo_estado,
     c.convites?.funcao, c.convites?.salario, c.convites?.data_admissao_prevista,
   ])]
   const csv = rows.map(r => r.map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(';')).join('\n')
@@ -2249,11 +2558,81 @@ function gerarCSV(data) {
   a.download = `RCONTRACT_${new Date().toISOString().slice(0,10)}.csv`; a.click()
 }
 
+function gerarXML(data) {
+  const esc = v => (v||'').toString()
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;')
+
+  const linhas = data.map(c => {
+    const deps = (c.dependentes || []).map(d => `
+      <DEPENDENTE>
+        <NOME>${esc(d.nome)}</NOME>
+        <CPF>${esc(d.cpf)}</CPF>
+        <PARENTESCO>${esc(d.parentesco)}</PARENTESCO>
+        <NASCIMENTO>${esc(d.data_nascimento)}</NASCIMENTO>
+      </DEPENDENTE>`).join('')
+
+    return `
+  <COLABORADOR>
+    <NOME>${esc(c.nome_completo)}</NOME>
+    <CPF>${esc(c.cpf)}</CPF>
+    <RG>${esc(c.rg)}</RG>
+    <ORGAO_EMISSOR>${esc(c.rg_orgao_emissor)}</ORGAO_EMISSOR>
+    <DATA_EMISSAO_RG>${esc(c.rg_data_emissao)}</DATA_EMISSAO_RG>
+    <NASCIMENTO>${esc(c.data_nascimento)}</NASCIMENTO>
+    <SEXO>${esc(c.sexo)}</SEXO>
+    <ESTADO_CIVIL>${esc(c.estado_civil)}</ESTADO_CIVIL>
+    <NACIONALIDADE>${esc(c.nacionalidade)}</NACIONALIDADE>
+    <NOME_MAE>${esc(c.nome_mae)}</NOME_MAE>
+    <NOME_PAI>${esc(c.nome_pai)}</NOME_PAI>
+    <TELEFONE>${esc(c.telefone)}</TELEFONE>
+    <WHATSAPP>${esc(c.whatsapp)}</WHATSAPP>
+    <EMAIL>${esc(c.email)}</EMAIL>
+    <CEP>${esc(c.cep)}</CEP>
+    <LOGRADOURO>${esc(c.logradouro)}</LOGRADOURO>
+    <NUMERO>${esc(c.numero)}</NUMERO>
+    <COMPLEMENTO>${esc(c.complemento)}</COMPLEMENTO>
+    <BAIRRO>${esc(c.bairro)}</BAIRRO>
+    <CIDADE>${esc(c.cidade)}</CIDADE>
+    <UF>${esc(c.estado)}</UF>
+    <PIS>${esc(c.pis)}</PIS>
+    <CTPS>${esc(c.ctps_numero)}</CTPS>
+    <SERIE_CTPS>${esc(c.ctps_serie)}</SERIE_CTPS>
+    <RESERVISTA>${esc(c.reservista)}</RESERVISTA>
+    <TITULO_ELEITOR>${esc(c.titulo_eleitor)}</TITULO_ELEITOR>
+    <TITULO_ZONA>${esc(c.titulo_zona)}</TITULO_ZONA>
+    <TITULO_SECAO>${esc(c.titulo_secao)}</TITULO_SECAO>
+    <TITULO_CIDADE>${esc(c.titulo_cidade)}</TITULO_CIDADE>
+    <TITULO_ESTADO>${esc(c.titulo_estado)}</TITULO_ESTADO>
+    <FUNCAO>${esc(c.convites?.funcao)}</FUNCAO>
+    <SALARIO>${esc(c.convites?.salario)}</SALARIO>
+    <OBRA_UNIDADE>${esc(c.convites?.obra_unidade)}</OBRA_UNIDADE>
+    <DATA_ADMISSAO>${esc(c.convites?.data_admissao_prevista)}</DATA_ADMISSAO>
+    <BANCO_COD>${esc(c.banco_codigo)}</BANCO_COD>
+    <BANCO_NOME>${esc(c.banco_nome)}</BANCO_NOME>
+    <AGENCIA>${esc(c.agencia)}</AGENCIA>
+    <CONTA>${esc(c.conta)}</CONTA>
+    <TIPO_CONTA>${esc(c.conta_tipo)}</TIPO_CONTA>
+    <DEPENDENTES>${deps}
+    </DEPENDENTES>
+  </COLABORADOR>`
+  }).join('')
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- RCONTRACT — Exportação de Admissões | ${new Date().toLocaleString('pt-BR')} -->
+<ADMISSOES TOTAL="${data.length}">${linhas}
+</ADMISSOES>`
+
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8;' })
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = `RCONTRACT_${new Date().toISOString().slice(0,10)}.xml`; a.click()
+}
+
 // ── DOCUMENTOS ──
 async function renderDocumentos() {
   const main = document.getElementById('page-main')
   try {
-    const { data } = await sb.from('documentos').select('*, colaboradores(nome_completo,cpf)').eq('status','pendente').is('deleted_at',null).order('created_at',{ascending:false}).limit(50)
+    const { data } = await sb.from('documentos').select('*, colaboradores(nome_completo,cpf)').eq('status','pendente').order('created_at',{ascending:false}).limit(50)
     main.innerHTML = `
     <div class="slide-up">
       <div class="card">
@@ -2274,6 +2653,7 @@ async function renderDocumentos() {
                 <td>
                   <div style="display:flex;gap:4px;flex-wrap:wrap;">
                     ${d.storage_path ? `<button class="btn btn-sm" style="background:var(--teal-xl);color:var(--teal-d);border:none;" onclick="previewDoc('${d.storage_path}')">👁 Ver</button>` : ''}
+                    ${d.storage_path ? `<button class="btn btn-sm" style="background:var(--gray100);color:var(--gray700);border:none;" onclick="baixarDoc('${d.storage_path}','${(d.colaboradores?.nome_completo||'Colaborador').replace(/'/g,"\\'")}','${d.tipo.replace(/_/g,' ')}','${d.mime_type||'image/jpeg'}')">⬇</button>` : ''}
                     <button class="btn btn-sm" style="background:var(--success-l);color:#22543D;border:none;" onclick="aprovarDoc('${d.id}')">✓ Aprovar</button>
                     <button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${d.id}')">✗ Reprovar</button>
                   </div>
@@ -2350,9 +2730,13 @@ async function initCandidato(token) {
     if (new Date(convite.validade_ate) < new Date()) { renderCandError('Este link de admissão expirou. Entre em contato com o RH.'); return }
 
     APP.conviteAtual = convite
-    APP.colaboradorId = convite.colaboradores?.id || null
-    APP.dadosCandidato = convite.colaboradores || {}
-    APP.etapaAtual = convite.colaboradores?.etapa_atual || 0
+    // Supabase pode retornar colaboradores como array (FK 1:many) ou objeto (FK 1:1)
+    // Normalizamos para sempre trabalhar com um único objeto
+    const colabRaw = convite.colaboradores
+    const colab = Array.isArray(colabRaw) ? (colabRaw[0] || null) : (colabRaw || null)
+    APP.colaboradorId = colab?.id || null
+    APP.dadosCandidato = colab ? { ...colab } : {}
+    APP.etapaAtual = colab?.etapa_atual || 0
 
     document.getElementById('cand-nome-header').textContent = convite.candidato_nome
     document.getElementById('cand-funcao-header').textContent = convite.funcao
@@ -2365,8 +2749,11 @@ async function initCandidato(token) {
     renderStepper()
     renderEtapa(APP.etapaAtual)
 
-    // Atualizar data de acesso
-    await sb.from('convites').update({ acessado_em: new Date().toISOString() }).eq('id', convite.id)
+    // Atualizar data de acesso e marcar atividade
+    await sb.from('convites').update({
+      acessado_em: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).eq('id', convite.id)
   } catch(e) {
     renderCandError(e.message)
   }
@@ -2517,11 +2904,24 @@ function renderLGPD(container) {
     try {
       // Limpar listener de resize
       _sigAbort.abort()
+
+      // Fazer upload da assinatura para Storage (evita base64 gigante no banco)
+      let assinatura_path = null
+      try {
+        const sigDataUrl = canvas.toDataURL('image/png')
+        const sigBlob = await (await fetch(sigDataUrl)).blob()
+        const sigFile = new File([sigBlob], 'assinatura.png', { type: 'image/png' })
+        const sigPath = `${APP.conviteAtual.id}/assinatura_lgpd_${Date.now()}.png`
+        const { error: upErr } = await sb.storage.from('admissoes').upload(sigPath, sigFile, { upsert: true, contentType: 'image/png' })
+        if (!upErr) assinatura_path = sigPath
+      } catch(sigErr) { /* Falha no upload não bloqueia o aceite */ }
+
       await sb.from('aceite_lgpd').insert({
         convite_id: APP.conviteAtual.id,
         aceito: true,
         user_agent: navigator.userAgent,
-        assinatura_dados: canvas.toDataURL('image/png'),
+        assinatura_path: assinatura_path,           // path no storage
+        assinatura_dados: assinatura_path ? null : canvas.toDataURL('image/png'), // fallback somente se upload falhou
         versao_termo: '1.0',
       })
 
@@ -2538,11 +2938,35 @@ function renderLGPD(container) {
 }
 
 // ── HELPER: Botões navegar ──
-function botoesNavegacao(numAtual, onAvancar) {
+// Mapa de handlers registrados por etapa — sem eval()
+const _etapaHandlers = {}
+
+function botoesNavegacao(numAtual, onAvancarFnName) {
+  // Registra handler seguro que reativa o botão em caso de erro
+  _etapaHandlers[numAtual] = async function(btn) {
+    if (btn.disabled) return
+    const labelOriginal = btn.textContent
+    btn.disabled = true
+    btn.textContent = 'Salvando...'
+    try {
+      // Chama a função pelo nome (sem eval) — ex: 'salvarEtapa1()'
+      const fnName = onAvancarFnName.replace('()', '')
+      if (typeof window[fnName] === 'function') {
+        await window[fnName]()
+      } else {
+        throw new Error(`Função "${fnName}" não encontrada.`)
+      }
+    } catch(e) {
+      console.error('Etapa ' + numAtual + ':', e)
+      toast('Erro ao salvar. Tente novamente.', 'error')
+      btn.disabled = false
+      btn.textContent = labelOriginal
+    }
+  }
   return `
   <div style="display:flex;gap:10px;margin-top:24px;justify-content:space-between;flex-wrap:wrap;">
     ${numAtual > 1 ? `<button class="btn btn-outline" onclick="renderEtapa(${numAtual-1}).catch(console.error)">← Voltar</button>` : '<div></div>'}
-    <button class="btn btn-primary btn-lg" id="btn-avancar-${numAtual}" onclick="if(!this.disabled){this.disabled=true;this.textContent='Salvando...';${onAvancar}}" style="flex:1;max-width:280px;justify-content:center;">
+    <button class="btn btn-primary btn-lg" id="btn-avancar-${numAtual}" onclick="_etapaHandlers[${numAtual}](this)" style="flex:1;max-width:280px;justify-content:center;">
       ${numAtual < 8 ? 'Salvar e Continuar →' : 'Enviar Documentação ✓'}
     </button>
   </div>`
@@ -2642,22 +3066,38 @@ async function salvarEtapa1() {
   const nascimento = document.getElementById('e1-nascimento').value
   const rg = document.getElementById('e1-rg').value.trim()
   const mae = document.getElementById('e1-mae').value.trim()
+  const sexo = document.getElementById('e1-sexo').value
+  const civil = document.getElementById('e1-civil').value
 
-  if (!nome) { toast('Nome obrigatório.', 'warning'); return }
-  document.getElementById('e1-cpf').classList.remove('error-field')
-  if (!cpf || !validarCPF(cpf)) { toast('CPF inválido.', 'error'); document.getElementById('e1-cpf').classList.add('error-field'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
-  if (!nascimento) { toast('Data de nascimento obrigatória.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
-  if (!rg) { toast('RG obrigatório.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
-  if (!mae) { toast('Nome da mãe obrigatório.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
+  // Limpar erros anteriores
+  ['e1-nome','e1-cpf','e1-nascimento','e1-rg','e1-mae','e1-sexo','e1-civil'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.classList.remove('error-field')
+  })
+
+  let errors = []
+  if (!nome) { document.getElementById('e1-nome').classList.add('error-field'); errors.push('Nome completo') }
+  if (!cpf || !validarCPF(cpf)) { document.getElementById('e1-cpf').classList.add('error-field'); errors.push('CPF válido') }
+  if (!nascimento) { document.getElementById('e1-nascimento').classList.add('error-field'); errors.push('Data de nascimento') }
+  if (!rg) { document.getElementById('e1-rg').classList.add('error-field'); errors.push('RG') }
+  if (!mae) { document.getElementById('e1-mae').classList.add('error-field'); errors.push('Nome da mãe') }
+  if (!sexo) { document.getElementById('e1-sexo').classList.add('error-field'); errors.push('Sexo') }
+  if (!civil) { document.getElementById('e1-civil').classList.add('error-field'); errors.push('Estado civil') }
+
+  if (errors.length > 0) {
+    toast(`Preencha: ${errors.join(', ')}.`, 'error')
+    const firstError = document.querySelector('#cand-content .error-field')
+    if (firstError) firstError.scrollIntoView({ behavior:'smooth', block:'center' })
+    return
+  }
 
   const dados = {
-    nome_completo: nome, cpf, data_nascimento: nascimento,
-    rg, rg_orgao_emissor: document.getElementById('e1-orgao').value,
+    nome_completo: uval('e1-nome'), cpf, data_nascimento: nascimento,
+    rg: uval('e1-rg'), rg_orgao_emissor: uval('e1-orgao'),
     rg_data_emissao: document.getElementById('e1-emissao').value || null,
-    sexo: document.getElementById('e1-sexo').value,
-    estado_civil: document.getElementById('e1-civil').value,
-    nacionalidade: document.getElementById('e1-nac').value,
-    nome_mae: mae, nome_pai: document.getElementById('e1-pai').value,
+    sexo, estado_civil: civil,
+    nacionalidade: uval('e1-nac'),
+    nome_mae: uval('e1-mae'), nome_pai: uval('e1-pai'),
     etapa_atual: 2,
   }
 
@@ -2700,8 +3140,11 @@ function renderEtapa2(container) {
 async function salvarEtapa2() {
   const tel = document.getElementById('e2-tel').value.trim()
   const email = document.getElementById('e2-email').value.trim()
-  if (!tel || !validarTelefone(tel)) { toast('Telefone inválido. Ex: (11) 99999-9999', 'warning'); return }
-  if (!email || !validarEmail(email)) { toast('E-mail inválido.', 'error'); return }
+  let errors = []
+  ;['e2-tel','e2-email'].forEach(id => document.getElementById(id).classList.remove('error-field'))
+  if (!tel || !validarTelefone(tel)) { document.getElementById('e2-tel').classList.add('error-field'); errors.push('Telefone válido') }
+  if (!email || !validarEmail(email)) { document.getElementById('e2-email').classList.add('error-field'); errors.push('E-mail válido') }
+  if (errors.length > 0) { toast(`Preencha: ${errors.join(', ')}.`, 'error'); return }
   await autoSave({ telefone: tel, whatsapp: document.getElementById('e2-wpp').value, email, etapa_atual: 3 })
   renderEtapa(3)
 }
@@ -2763,6 +3206,12 @@ function renderEtapa3(container) {
   </div>`
 
   applyMask(document.getElementById('e3-cep'), 'cep')
+  // Buscar CEP automaticamente ao sair do campo
+  const cepInput = document.getElementById('e3-cep')
+  cepInput.addEventListener('blur', () => {
+    const cep = cepInput.value.replace(/\D/g,'')
+    if (cep.length === 8) buscarCEP()
+  })
 }
 
 async function buscarCEP() {
@@ -2771,7 +3220,11 @@ async function buscarCEP() {
   const btn = document.getElementById('btn-cep')
   btn.disabled = true; btn.textContent = '...'
   try {
-    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+    // AbortController com timeout de 8s para não travar se a API estiver lenta
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: controller.signal })
+    clearTimeout(timeoutId)
     const data = await res.json()
     if (data.erro) { toast('CEP não encontrado.', 'error'); return }
     document.getElementById('e3-logradouro').value = data.logradouro || ''
@@ -2780,7 +3233,13 @@ async function buscarCEP() {
     document.getElementById('e3-estado').value = data.uf || ''
     document.getElementById('e3-numero').focus()
     toast('Endereço preenchido!', 'success')
-  } catch(e) { toast('Erro ao buscar CEP.', 'error') }
+  } catch(e) {
+    if (e.name === 'AbortError') {
+      toast('Tempo esgotado ao buscar CEP. Preencha manualmente.', 'warning')
+    } else {
+      toast('Erro ao buscar CEP. Verifique sua conexão.', 'error')
+    }
+  }
   finally { btn.disabled = false; btn.textContent = '🔍' }
 }
 
@@ -2788,13 +3247,27 @@ async function salvarEtapa3() {
   const cep = document.getElementById('e3-cep').value.trim()
   const log = document.getElementById('e3-logradouro').value.trim()
   const num = document.getElementById('e3-numero').value.trim()
-  if (!cep || !log || !num) { toast('Preencha os campos obrigatórios.', 'warning'); return }
+  const bairro = document.getElementById('e3-bairro').value.trim()
+  const cidade = document.getElementById('e3-cidade').value.trim()
+  const estado = document.getElementById('e3-estado').value
+
+  ;['e3-cep','e3-logradouro','e3-numero','e3-bairro','e3-cidade','e3-estado'].forEach(id => document.getElementById(id)?.classList.remove('error-field'))
+
+  let errors = []
+  if (!cep || cep.replace(/\D/g,'').length !== 8) { document.getElementById('e3-cep').classList.add('error-field'); errors.push('CEP') }
+  if (!log) { document.getElementById('e3-logradouro').classList.add('error-field'); errors.push('Logradouro') }
+  if (!num) { document.getElementById('e3-numero').classList.add('error-field'); errors.push('Número') }
+  if (!bairro) { document.getElementById('e3-bairro').classList.add('error-field'); errors.push('Bairro') }
+  if (!cidade) { document.getElementById('e3-cidade').classList.add('error-field'); errors.push('Cidade') }
+  if (!estado) { document.getElementById('e3-estado').classList.add('error-field'); errors.push('Estado') }
+
+  if (errors.length > 0) { toast(`Preencha: ${errors.join(', ')}.`, 'error'); return }
+
   await autoSave({
-    cep, logradouro: log, numero: num,
-    complemento: document.getElementById('e3-comp').value,
-    bairro: document.getElementById('e3-bairro').value,
-    cidade: document.getElementById('e3-cidade').value,
-    estado: document.getElementById('e3-estado').value,
+    cep, logradouro: uval('e3-logradouro'), numero: uval('e3-numero'),
+    complemento: uval('e3-comp'),
+    bairro: uval('e3-bairro'), cidade: uval('e3-cidade'),
+    estado,
     etapa_atual: 4,
   })
   renderEtapa(4)
@@ -2846,6 +3319,19 @@ function renderEtapa4(container) {
             <input type="text" id="e4-secao" value="${d.titulo_secao||''}" placeholder="0000">
           </div>
         </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Cidade do Título</label>
+            <input type="text" id="e4-titulo-cidade" value="${d.titulo_cidade||''}" placeholder="São Paulo">
+          </div>
+          <div class="field">
+            <label>Estado do Título</label>
+            <select id="e4-titulo-estado">
+              <option value="">UF</option>
+              ${['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf=>`<option value="${uf}" ${d.titulo_estado===uf?'selected':''}>${uf}</option>`).join('')}
+            </select>
+          </div>
+        </div>
         <div class="divider"></div>
         <div style="background:var(--warn-l);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:16px;">
           <div style="font-size:12px;font-weight:700;color:#744210;margin-bottom:4px;">Dados da Vaga</div>
@@ -2866,6 +3352,8 @@ async function salvarEtapa4() {
     titulo_eleitor: document.getElementById('e4-titulo').value,
     titulo_zona: document.getElementById('e4-zona').value,
     titulo_secao: document.getElementById('e4-secao').value,
+    titulo_cidade: document.getElementById('e4-titulo-cidade').value,
+    titulo_estado: document.getElementById('e4-titulo-estado').value,
     etapa_atual: 5,
   })
   renderEtapa(5)
@@ -2930,7 +3418,17 @@ async function salvarEtapa5() {
   const agencia = document.getElementById('e5-agencia').value.trim()
   const conta = document.getElementById('e5-conta').value.trim()
   const tipo = document.getElementById('e5-tipo').value
-  if (!banco || !agencia || !conta || !tipo) { toast('Preencha todos os campos bancários.', 'warning'); return }
+
+  ;['e5-banco','e5-agencia','e5-conta','e5-tipo'].forEach(id => document.getElementById(id)?.classList.remove('error-field'))
+
+  let errors = []
+  if (!banco) { document.getElementById('e5-banco').classList.add('error-field'); errors.push('Banco') }
+  if (!agencia) { document.getElementById('e5-agencia').classList.add('error-field'); errors.push('Agência') }
+  if (!conta) { document.getElementById('e5-conta').classList.add('error-field'); errors.push('Conta') }
+  if (!tipo) { document.getElementById('e5-tipo').classList.add('error-field'); errors.push('Tipo de conta') }
+
+  if (errors.length > 0) { toast(`Preencha: ${errors.join(', ')}.`, 'error'); return }
+
   const [bancoCod, bancoNome] = banco.split('|')
   await autoSave({ banco_codigo: bancoCod, banco_nome: bancoNome, agencia, conta, conta_tipo: tipo, etapa_atual: 6 })
   renderEtapa(6)
@@ -3009,16 +3507,50 @@ async function salvarEtapa6() {
     data_nascimento: document.getElementById(`dep-${i}-nasc`)?.value || null,
   })).filter(d => d.nome)
 
+  // Se há dependentes mas ainda não temos colaboradorId, criar o registro primeiro via autoSave
+  if ((APP.dependentes||[]).length > 0 && !APP.colaboradorId) {
+    await autoSave({ etapa_atual: 6 })
+  }
   if (APP.colaboradorId && (APP.dependentes||[]).length > 0) {
-    await sb.from('dependentes').delete().eq('colaborador_id', APP.colaboradorId)
-    await sb.from('dependentes').insert(APP.dependentes.map((d,i) => ({ ...d, colaborador_id: APP.colaboradorId, ordem: i })))
+    // Operação em duas etapas: delete depois insert
+    // Guardamos backup para restaurar em caso de falha no insert
+    const { data: depsBackup } = await sb.from('dependentes').select('*').eq('colaborador_id', APP.colaboradorId)
+    const { error: delErr } = await sb.from('dependentes').delete().eq('colaborador_id', APP.colaboradorId)
+    if (delErr) throw delErr
+    const { error: insErr } = await sb.from('dependentes').insert(
+      APP.dependentes.map((d,i) => ({ ...d, colaborador_id: APP.colaboradorId, ordem: i }))
+    )
+    if (insErr) {
+      // Rollback: tentar reinserir o backup
+      if (depsBackup?.length) {
+        await sb.from('dependentes').insert(depsBackup.map(({id, ...d}) => d)).catch(() => {})
+      }
+      throw insErr
+    }
+  } else if ((APP.dependentes||[]).length > 0 && !APP.colaboradorId) {
+    // Sem ID mesmo após tentativa de save — avisar mas não bloquear
+    toast('Salve os dados das etapas anteriores antes de adicionar dependentes.', 'warning')
+    const _b6 = document.getElementById('btn-avancar-6'); if (_b6) { _b6.disabled = false; _b6.textContent = 'Salvar e Continuar →' }
+    return
   }
   await autoSave({ etapa_atual: 7 })
   renderEtapa(7)
 }
 
 // ── ETAPA 7: Foto ──
-function renderEtapa7(container) {
+async function renderEtapa7(container) {
+  // Se tem foto_path, gerar URL assinada para preview
+  let fotoPreviewHtml = `<div style="width:120px;height:150px;background:var(--gray100);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:48px;border:2px dashed var(--gray300);">👤</div>`
+
+  if (APP.dadosCandidato.foto_path) {
+    try {
+      const { data: signed } = await sb.storage.from('admissoes').createSignedUrl(APP.dadosCandidato.foto_path, 300)
+      if (signed?.signedUrl) {
+        fotoPreviewHtml = `<img src="${signed.signedUrl}" class="photo-preview" id="foto-preview" onerror="this.parentElement.innerHTML='<div style=\\'width:120px;height:150px;background:var(--gray100);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:48px;border:2px dashed var(--gray300);\\'>👤</div>'">`
+      }
+    } catch(e) { /* silently fail, show placeholder */ }
+  }
+
   container.innerHTML = `
   <div class="form-container">
     <div style="margin-bottom:20px;">
@@ -3029,17 +3561,14 @@ function renderEtapa7(container) {
     <div class="card">
       <div class="card-body" style="text-align:center;">
         <div id="foto-preview-wrap" style="margin-bottom:16px;">
-          ${APP.dadosCandidato.foto_url ?
-            `<img src="${APP.dadosCandidato.foto_url}" class="photo-preview" id="foto-preview">` :
-            `<div style="width:120px;height:150px;background:var(--gray100);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:48px;border:2px dashed var(--gray300);">👤</div>`
-          }
+          ${fotoPreviewHtml}
         </div>
-        <input type="file" id="foto-input" accept="image/*" capture="user" style="display:none" onchange="previewFoto(event)">
+        <input type="file" id="foto-input" accept="image/*,application/pdf" capture="user" style="display:none" onchange="previewFoto(event)">
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
           <button class="btn btn-outline" onclick="document.getElementById('foto-input').click()">📷 Tirar Foto / Galeria</button>
-          ${APP.dadosCandidato.foto_url ? `<button class="btn btn-ghost" onclick="removerFoto()">✕ Remover</button>` : ''}
+          ${APP.dadosCandidato.foto_path ? `<button class="btn btn-ghost" onclick="removerFoto()">✕ Remover</button>` : ''}
         </div>
-        <p style="font-size:11px;color:var(--gray400);margin-top:12px;">Foto frente, boa iluminação. JPG ou PNG, máx. 10MB.</p>
+        <p style="font-size:11px;color:var(--gray400);margin-top:12px;">Foto frente, boa iluminação. JPG, PNG ou PDF, máx. 10MB.</p>
         ${botoesNavegacao(7, 'salvarEtapa7()')}
       </div>
     </div>
@@ -3049,30 +3578,46 @@ function renderEtapa7(container) {
 function previewFoto(e) {
   const file = e.target.files[0]
   if (!file) return
-  const reader = new FileReader()
-  reader.onload = ev => {
+  if (file.size > 10 * 1024 * 1024) { toast('Arquivo muito grande. Máx 10MB.', 'error'); return }
+  const allowedTypes = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf']
+  if (!allowedTypes.includes(file.type)) { toast('Tipo inválido. Use JPG, PNG ou PDF.', 'error'); return }
+  APP._fotoFile = file
+  if (file.type === 'application/pdf') {
     const wrap = document.getElementById('foto-preview-wrap')
-    wrap.innerHTML = `<img src="${ev.target.result}" class="photo-preview" id="foto-preview">`
-    APP._fotoFile = file
-    toast('Foto carregada!', 'success')
+    wrap.innerHTML = `<div style="width:120px;height:150px;background:var(--teal-xl);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0 auto;border:2px solid var(--teal);gap:8px;"><div style="font-size:36px;">📄</div><div style="font-size:10px;font-weight:600;color:var(--teal-d);text-align:center;padding:0 8px;word-break:break-all;">${file.name.slice(0,20)}</div></div>`
+    toast('PDF carregado!', 'success')
+  } else {
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const wrap = document.getElementById('foto-preview-wrap')
+      wrap.innerHTML = `<img src="${ev.target.result}" class="photo-preview" id="foto-preview">`
+      toast('Foto carregada!', 'success')
+    }
+    reader.readAsDataURL(file)
   }
-  reader.readAsDataURL(file)
 }
 
-function removerFoto() { APP._fotoFile = null; APP.dadosCandidato.foto_url = null; renderEtapa7(document.getElementById('cand-content')) }
+function removerFoto() { APP._fotoFile = null; APP.dadosCandidato.foto_path = null; APP.dadosCandidato.foto_url = null; renderEtapa7(document.getElementById('cand-content')) }
 
 async function salvarEtapa7() {
   if (APP._fotoFile && APP.colaboradorId) {
     const btn7 = document.getElementById('btn-avancar-7')
-    if (btn7) { btn7.disabled = true; btn7.textContent = 'Enviando foto...' }
+    if (btn7) { btn7.disabled = true; btn7.textContent = 'Enviando...' }
     try {
-      const fileComprimido = await comprimirImagem(APP._fotoFile, 800, 0.85)
-      const path = `${APP.conviteAtual.id}/foto_perfil.jpg`
-      const { error } = await sb.storage.from('admissoes').upload(path, fileComprimido, { upsert: true, contentType: 'image/jpeg' })
+      const isPdf = APP._fotoFile.type === 'application/pdf'
+      let fileToUpload = APP._fotoFile
+      const ext = isPdf ? 'pdf' : 'jpg'
+      if (!isPdf) {
+        fileToUpload = await comprimirImagem(APP._fotoFile, 800, 0.85)
+      }
+      const path = `${APP.conviteAtual.id}/foto_perfil.${ext}`
+      const { error } = await sb.storage.from('admissoes').upload(path, fileToUpload, { upsert: true, contentType: fileToUpload.type })
       if (error) throw error
+      // Salvar apenas o path, não URL pública (evita erro 400)
       await autoSave({ foto_path: path, etapa_atual: 8 })
+      APP._fotoFile = null
     } catch(e) {
-      toast('Erro ao enviar foto: ' + e.message, 'error')
+      toast('Erro ao enviar foto: ' + (e.message || 'Verifique sua conexão'), 'error')
       const _b7 = document.getElementById('btn-avancar-7'); if (_b7) { _b7.disabled = false; _b7.textContent = 'Salvar e Continuar →' }
       return
     }
@@ -3082,23 +3627,39 @@ async function salvarEtapa7() {
   renderEtapa(8)
 }
 
-// ── ETAPA 8: Documentos ──
+// ── ETAPA 8: Documentos — REALTEC ENGENHARIA ──
 const DOC_TIPOS = {
-  pessoal: [
-    { key:'rg', label:'RG (frente e verso)', required: true },
-    { key:'cpf', label:'CPF', required: true },
-    { key:'ctps', label:'Carteira de Trabalho (CTPS)', required: true },
-    { key:'titulo_eleitor', label:'Título de Eleitor', required: false },
-    { key:'reservista', label:'Certificado de Reservista', required: false },
-    { key:'comp_residencia', label:'Comprovante de Residência', required: true },
-    { key:'cartao_banco', label:'Cartão / Comprovante Bancário', required: true },
-    { key:'foto_3x4', label:'Foto 3×4', required: false },
+  // Obrigatórios para todos os cargos
+  obrigatorios: [
+    { key:'qualificacao_cef',   label:'Qualificação Cadastral (CEF)',                         required: true  },
+    { key:'ctps',               label:'Carteira de Trabalho (CTPS) — 3 anos na função',       required: true  },
+    { key:'rg',                 label:'RG — Carteira de Identidade (original)',                required: true  },
+    { key:'cpf',                label:'CPF — Cadastro de Pessoa Física (original)',            required: true  },
+    { key:'pis',                label:'PIS — Programa de Integração Social (original)',        required: true  },
+    { key:'titulo_eleitor',     label:'Título de Eleitor (original)',                          required: true  },
+    { key:'reservista',         label:'Carteira de Reservista (original)',                     required: false },
+    { key:'cnh',                label:'CNH — Carteira de Habilitação',                        required: false },
+    { key:'decl_escolaridade',  label:'Declaração de Escolaridade',                           required: true  },
+    { key:'cert_casamento',     label:'Certidão de Casamento / Escritura União Estável',      required: false },
+    { key:'cert_nascimento',    label:'Certidão de Nascimento',                               required: false },
+    { key:'comp_residencia',    label:'Comprovante de Residência (com CEP e Bairro)',          required: true  },
+    { key:'cartao_sus',         label:'Cartão SUS + Vacina Atualizada',                       required: true  },
+    { key:'cartao_banco',       label:'Conta Corrente Banco Itaú — Comprovante',              required: true  },
+    { key:'foto_3x4',           label:'2 Fotos 3×4',                                          required: true  },
   ],
+  // Documentos para cargos especializados
+  especializados: [
+    { key:'cert_senai_nr10',    label:'Eletricista — Certificado SENAI + NR10 Válida (Inicial 40h)', required: false },
+    { key:'cert_solda',         label:'Soldador — Certificado de Solda',                             required: false },
+    { key:'vacina_hepatite_b',  label:'Eletricista — Vacina Hepatite B (comprovante)',               required: false },
+  ],
+  // Documentos dos dependentes
   dependente: [
-    { key:'rg_dep', label:'RG do Dependente', required: false },
-    { key:'cpf_dep', label:'CPF do Dependente', required: false },
-    { key:'cert_nasc', label:'Certidão de Nascimento/Casamento', required: false },
-  ]
+    { key:'cartao_sus_dep',     label:'Cartão SUS do Dependente',                            required: false },
+    { key:'rg_dep',             label:'RG do Dependente',                                    required: false },
+    { key:'cpf_dep',            label:'CPF do Dependente',                                   required: false },
+    { key:'cart_vacina_dep',    label:'Carteira de Vacinação (filhos < 14 anos)',             required: false },
+  ],
 }
 
 async function renderEtapa8(container) {
@@ -3133,19 +3694,33 @@ async function renderEtapa8(container) {
     </div>
   </div>`
 
+  // Contar obrigatórios enviados para mostrar progresso
+  const totalObrig = DOC_TIPOS.obrigatorios.filter(t => t.required).length
+  const enviadosObrig = DOC_TIPOS.obrigatorios.filter(t => t.required && uploadMap[t.key]).length
+  const pctDocs = Math.round((enviadosObrig / totalObrig) * 100)
+
   container.innerHTML = `
   <div class="form-container">
     <div style="margin-bottom:20px;">
       <div style="font-size:11px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 8 de 8</div>
       <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Envio de Documentos</h2>
-      <p style="font-size:13px;color:var(--gray500);">Envie PDF, JPG ou PNG (máx. 10MB por arquivo).</p>
+      <p style="font-size:13px;color:var(--gray500);">Envie os documentos em PDF, JPG ou PNG (máx. 20MB por arquivo).</p>
+      <div style="margin-top:10px;background:var(--gray100);border-radius:99px;height:6px;overflow:hidden;">
+        <div style="height:100%;background:${pctDocs === 100 ? 'var(--success)' : 'var(--teal)'};width:${pctDocs}%;border-radius:99px;transition:width .4s;"></div>
+      </div>
+      <div style="font-size:11px;color:var(--gray500);margin-top:4px;">${enviadosObrig} de ${totalObrig} obrigatórios enviados</div>
     </div>
     <div class="card">
       <div class="card-body">
-        ${renderDocSection('📋 Documentos Pessoais', DOC_TIPOS.pessoal)}
+        ${renderDocSection('📋 Documentos Obrigatórios', DOC_TIPOS.obrigatorios)}
+        ${renderDocSection('🏆 Documentos por Cargo (se aplicável)', DOC_TIPOS.especializados)}
         ${(APP.dependentes||[]).length > 0 ? renderDocSection('👶 Documentos dos Dependentes', DOC_TIPOS.dependente) : ''}
+        <div style="background:var(--warn-l);border:1px solid #F6AD55;border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12px;color:#744210;">
+          <b>⚠️ Atenção:</b> Documentos <b>originais</b> serão solicitados presencialmente na admissão. Envie fotos/scans legíveis aqui para agilizar o processo.
+        </div>
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12px;color:var(--teal-d);">
-          <b>ℹ️ Dica:</b> Você pode tirar fotos dos documentos diretamente pelo celular. Certifique-se de que estejam legíveis e sem reflexo.
+          <b>ℹ️ Dica:</b> Você pode tirar fotos pelo celular. Certifique-se de que estejam bem iluminadas e legíveis, sem reflexo.<br>
+          <b>📞 Dúvidas?</b> Tel: (11) 4461-2900 · Cel: (11) 97345-3824
         </div>
         <div id="upload-progress" style="display:none;margin-bottom:12px;"></div>
         ${botoesNavegacao(8, 'finalizarAdmissao()')}
@@ -3188,18 +3763,20 @@ async function comprimirImagem(file, maxWidth = 1600, quality = 0.82) {
 async function uploadDoc(tipo, categoria, event) {
   const fileOrig = event.target.files[0]; if (!fileOrig) return
   if (fileOrig.size > 20 * 1024 * 1024) { toast('Arquivo muito grande (máx. 20MB).', 'error'); return }
-  const allowedTypes = ['image/jpeg','image/jpg','image/png','application/pdf']
+  const allowedTypes = ['image/jpeg','image/jpg','image/png','image/webp','application/pdf']
   if (!allowedTypes.includes(fileOrig.type)) { toast('Tipo inválido. Use PDF, JPG ou PNG.', 'error'); return }
   if (!APP.colaboradorId) { toast('Salve os dados anteriores antes de enviar documentos.', 'warning'); return }
 
+  // Encontrar botão de envio
   const inputEl = document.getElementById(`upload-${tipo}`)
   const btnEl = inputEl ? inputEl.nextElementSibling : null
   if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Enviando...' }
-  toast('Comprimindo e enviando...', 'info')
+  toast('Enviando documento...', 'info')
 
   try {
-    const file = await comprimirImagem(fileOrig)
-    const ext = file.type === 'application/pdf' ? 'pdf' : 'jpg'
+    const isPdf = fileOrig.type === 'application/pdf'
+    const file = isPdf ? fileOrig : await comprimirImagem(fileOrig)
+    const ext = isPdf ? 'pdf' : 'jpg'
     const path = `${APP.conviteAtual.id}/${tipo}_${Date.now()}.${ext}`
 
     await retryOp(async () => {
@@ -3237,10 +3814,14 @@ async function finalizarAdmissao() {
   if (btn8) { btn8.disabled = true; btn8.textContent = 'Finalizando...' }
   try {
     await autoSave({ etapa_atual: 8 })
-    await sb.from('convites').update({ status: 'em_analise', finalizado_em: new Date().toISOString() }).eq('id', APP.conviteAtual.id)
 
-    // Tela de sucesso
+    // Gerar protocolo e persistir no banco para consistência
     const protocolo = gerarProtocolo()
+    await sb.from('convites').update({
+      status: 'em_analise',
+      finalizado_em: new Date().toISOString(),
+      protocolo_ref: protocolo,
+    }).eq('id', APP.conviteAtual.id)
     document.getElementById('stepper-container').style.opacity = '0.3'
     document.getElementById('cand-content').innerHTML = `
     <div class="success-wrap fade-in">
@@ -3347,6 +3928,22 @@ const _loadTimeout = setTimeout(() => {
     el.innerHTML = '<div style="color:white;text-align:center;padding:40px;"><div style="font-size:48px;margin-bottom:16px;">⏱️</div><div style="font-size:16px;font-weight:600;">Tempo esgotado</div><div style="font-size:13px;opacity:.7;margin-top:8px;">Não foi possível conectar. Verifique sua internet.</div><button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;background:#C9A84C;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Tentar novamente</button></div>'
   }
 }, 12000)
+
+// ── Monitor de sessão: detectar expiração enquanto o usuário está na tela ──
+sb.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+    // Só redireciona se for admin (não afeta candidatos sem login)
+    if (APP.user) {
+      APP.user = null; APP.profile = null
+      showPage('page-login')
+      toast('Sessão expirada. Faça login novamente.', 'warning')
+    }
+  }
+  if (event === 'TOKEN_REFRESHED' && session) {
+    // Token renovado com sucesso — silencioso
+    APP.user = session.user
+  }
+})
 
 // ── INIT ──
 initAuth().then(() => clearTimeout(_loadTimeout))
