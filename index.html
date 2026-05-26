@@ -293,15 +293,16 @@ img { max-width: 100%; }
    ADMIN LAYOUT
 ══════════════════════════════════════════ */
 #app-layout {
-  display: grid;
-  grid-template-columns: 256px 1fr;
+  display: flex;
   min-height: 100vh;
+  width: 100%;
+  position: relative;
 }
 /* Notebook: sidebar menor */
 @media (max-width: 1280px) and (min-width: 1025px) {
-  #app-layout { grid-template-columns: 220px 1fr; }
+  #app-layout { /* sidebar 220px handled in #main-content */ }
 }
-@media (max-width: 1024px) { #app-layout { grid-template-columns: 1fr; } }
+@media (max-width: 1024px) { #app-layout { flex-direction: column; } }
 
 /* ── Sidebar ── */
 #sidebar {
@@ -400,11 +401,12 @@ img { max-width: 100%; }
   min-height: 100vh;
   display: flex; flex-direction: column;
   min-width: 0;
+  width: calc(100% - 256px);
 }
 @media (max-width: 1280px) and (min-width: 1025px) {
-  #main-content { margin-left: 220px; }
+  #main-content { margin-left: 220px; width: calc(100% - 220px); }
 }
-@media (max-width: 1024px) { #main-content { margin-left: 0; } }
+@media (max-width: 1024px) { #main-content { margin-left: 0; width: 100%; } }
 
 .topbar {
   background: white;
@@ -413,7 +415,10 @@ img { max-width: 100%; }
   display: flex; align-items: center; justify-content: space-between;
   position: sticky; top: 0; z-index: 50;
   gap: 12px;
-  box-shadow: 0 1px 0 var(--gray100);
+  box-shadow: 0 2px 8px rgba(10,35,66,.06);
+  flex-shrink: 0;
+  /* Garante que não sobreponha conteúdo abaixo */
+  isolation: isolate;
 }
 .topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1; }
 .topbar-title { font-size: 16px; font-weight: 700; color: var(--navy); }
@@ -424,10 +429,10 @@ img { max-width: 100%; }
   .topbar { padding: 12px 14px; }
   .topbar-sub { display: none; }
   .topbar-title { font-size: 15px; }
-  .topbar-right .btn { display: none; }
+  .topbar-right { display: none; }
 }
 
-.page-body { padding: 24px; flex: 1; max-width: 100%; }
+.page-body { padding: 24px; flex: 1; width: 100%; overflow-x: hidden; }
 @media (max-width: 768px) { .page-body { padding: 16px; } }
 @media (max-width: 480px) { .page-body { padding: 12px; } }
 
@@ -476,23 +481,23 @@ img { max-width: 100%; }
 
 .stat-card {
   background: white; border-radius: var(--radius-lg);
-  padding: 18px; border: 1px solid var(--gray100);
+  padding: 20px 18px; border: 1px solid var(--gray100);
   box-shadow: var(--shadow-sm);
-  transition: transform .2s, box-shadow .2s;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
   cursor: default;
 }
-.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); border-color: rgba(0,180,216,.2); }
 .stat-icon-wrap {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 44px; height: 44px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; margin-bottom: 12px;
+  font-size: 18px; margin-bottom: 14px;
 }
-.stat-val, .stat-number { font-size: 28px; font-weight: 800; color: var(--navy); line-height: 1; margin-bottom: 4px; }
+.stat-val, .stat-number { font-size: 32px; font-weight: 800; color: var(--navy); line-height: 1; margin-bottom: 6px; }
 .stat-label { font-size: 12px; color: var(--gray500); font-weight: 500; }
 .stat-icon {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 44px; height: 44px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px; flex-shrink: 0;
 }
 
 /* Badges */
@@ -860,9 +865,51 @@ tbody tr:hover td { background: var(--gray50); }
   border-radius: var(--radius-sm); padding: 9px 12px;
   font-family: var(--mono); font-size: 12px; color: var(--navy);
   background: white; outline: none;
+.link-box-label { font-size: 12px; font-weight: 700; color: var(--teal-d); margin-bottom: 8px; }
+.link-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.link-input {
+  flex: 1; min-width: 0; border: 1.5px solid rgba(0,180,216,.2);
+  border-radius: var(--radius-sm); padding: 9px 12px;
+  font-family: var(--mono); font-size: 12px; color: var(--navy);
+  background: white; outline: none;
 }
+
+/* ── Classes utilitárias faltantes ── */
+/* form-container: wrapper das etapas do candidato */
+.form-container { max-width: 640px; margin: 0 auto; padding: 22px 16px; }
+.chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 6px; border-radius: 99px;
+  background: var(--teal-xl); color: var(--teal-d);
+  font-size: 9px; font-weight: 700; margin-left: 4px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+/* e-icon = alias de empty-icon */
+.e-icon { font-size: 48px; margin-bottom: 14px; display: block; }
+
+/* btn-loading: spinner no botão */
+.btn-loading {
+  position: relative; color: transparent !important;
+  pointer-events: none;
+}
+.btn-loading::after {
+  content: '';
+  position: absolute; top: 50%; left: 50%;
+  width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: white; border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+/* alert-info faltando */
+.alert-info { background: var(--teal-xl); color: #0B4F6C; border-left: 3px solid var(--teal); }
+
+/* scroll suave no page-main */
+#page-main { scroll-behavior: smooth; }
+
+/* Garante que imagens e tabelas não ultrapassem a largura */
+#page-main img, #page-main table { max-width: 100%; }
 </style>
-</head>
 <body>
 
 <!-- Loading -->
@@ -1026,7 +1073,7 @@ tbody tr:hover td { background: var(--gray50); }
         </div>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-primary btn-sm" data-page="novo-convite">
+        <button class="btn btn-primary btn-sm" onclick="navigateTo('novo-convite')">
           ➕ Novo Convite
         </button>
       </div>
@@ -1159,7 +1206,7 @@ const APP = {
 function toast(msg, type = 'success') {
   const container = document.getElementById('toast-container')
   const icons = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' }
-  const borders = { success: 'var(--gold)', error: 'var(--error)', warning: 'var(--warn)', info: 'var(--teal)' }
+  const borders = { success: 'var(--teal)', error: 'var(--error)', warning: 'var(--warn)', info: 'var(--teal)' }
   const el = document.createElement('div')
   el.className = `toast ${type}`
   el.style.borderLeftColor = borders[type] || borders.info
@@ -1372,14 +1419,14 @@ document.getElementById('mobile-overlay').addEventListener('click', () => {
 
 document.querySelectorAll('[data-page]').forEach(btn => {
   btn.addEventListener('click', () => {
-    const page = btn.dataset.page
-    navigateTo(page)
-    document.getElementById('sidebar').classList.remove('open')
-    document.getElementById('mobile-overlay').classList.remove('active')
+    navigateTo(btn.dataset.page)
   })
 })
 
 function navigateTo(page) {
+  // Evitar re-renderizar a mesma página desnecessariamente
+  if (APP.currentPage === page && document.getElementById('page-main').children.length > 0 &&
+      !document.getElementById('page-main').querySelector('.load-ring')) return
   APP.currentPage = page
   document.querySelectorAll('.nav-item').forEach(b => {
     b.classList.toggle('active', b.dataset.page === page)
@@ -1395,6 +1442,9 @@ function navigateTo(page) {
   const [title, sub] = titles[page] || ['Sistema', '']
   document.getElementById('page-title').textContent = title
   document.getElementById('page-subtitle').textContent = sub
+  // Fechar sidebar e overlay no mobile
+  document.getElementById('sidebar').classList.remove('open')
+  document.getElementById('mobile-overlay').classList.remove('active')
   renderPage(page)
 }
 
@@ -1465,32 +1515,44 @@ async function renderDashboard() {
     <div class="slide-up">
       <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-icon" style="background:#EFF6FF;font-size:20px;">📅</div>
-          <div class="stat-number">${stats.hoje}</div>
+          <div class="stat-icon" style="background:var(--teal-xl);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div class="stat-number" style="color:var(--navy);">${stats.hoje}</div>
           <div class="stat-label">Criados Hoje</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--warn-l);font-size:20px;">⏳</div>
-          <div class="stat-number" style="color:#744210;">${stats.pendentes}</div>
+          <div class="stat-icon" style="background:var(--warn-l);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+          <div class="stat-number" style="color:var(--warn);">${stats.pendentes}</div>
           <div class="stat-label">Pendentes</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:#EFF6FF;font-size:20px;">📝</div>
+          <div class="stat-icon" style="background:var(--teal-xl);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
           <div class="stat-number" style="color:var(--teal-d);">${stats.andamento}</div>
           <div class="stat-label">Em Andamento</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--success-l);font-size:20px;">✅</div>
-          <div class="stat-number" style="color:#22543D;">${stats.completas}</div>
+          <div class="stat-icon" style="background:var(--success-l);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="stat-number" style="color:var(--success);">${stats.completas}</div>
           <div class="stat-label">Completas</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:#FFEDD5;font-size:20px;">⚠️</div>
-          <div class="stat-number" style="color:#9A3412;">${stats.incompletas}</div>
+          <div class="stat-icon" style="background:#FFF3CD;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="stat-number" style="color:#D97706;">${stats.incompletas}</div>
           <div class="stat-label">Doc. Incompleta</div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon" style="background:var(--gray100);font-size:20px;">⏰</div>
+          <div class="stat-icon" style="background:var(--gray100);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gray500)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/><path d="M16.24 7.76l-1.42 1.42"/></svg>
+          </div>
           <div class="stat-number" style="color:var(--gray500);">${stats.expirados}</div>
           <div class="stat-label">Expirados</div>
         </div>
@@ -1558,12 +1620,12 @@ async function renderAdmissoes() {
     <div class="card">
       <div class="card-header">
         <h3>Todos os Processos</h3>
-        <button class="btn btn-gold btn-sm" onclick="navigateTo('novo-convite')">➕ Novo Convite</button>
+        <button class="btn btn-primary btn-sm" onclick="navigateTo('novo-convite')">➕ Novo Convite</button>
       </div>
       <div class="card-body" style="padding-bottom:0;">
         <div class="search-bar">
-          <div class="search-input-wrap">
-            <span class="s-icon">🔍</span>
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
             <input type="text" id="adm-search" placeholder="Buscar por nome, e-mail, função..." value="${admSearch}">
           </div>
           <select class="filter-select" id="adm-filter">
@@ -1649,7 +1711,7 @@ async function loadAdmissoesTable() {
               </div>
             </td>
           </tr>`
-        }).join('') || '<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="e-icon">🔍</div><div class="empty-title">Nenhum resultado</h3></div></td></tr>'}
+        }).join('') || '<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="e-icon">🔍</div><div class="empty-title">Nenhum resultado</div></div></td></tr>'}
       </tbody>
     </table>`
 
@@ -1674,7 +1736,7 @@ function copiarLink(token) {
 function renderNovoConvite() {
   const main = document.getElementById('page-main')
   main.innerHTML = `
-  <div class="slide-up" style="max-width:700px;">
+  <div class="slide-up" style="max-width:100%;">
     <div class="card">
       <div class="card-header" style="background:linear-gradient(135deg,var(--navy),var(--navy3));border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:none;">
         <div>
@@ -1893,7 +1955,7 @@ async function abrirDetalheAdmissao(id) {
       </div>
     </div>
     <div id="tab-content-dados" class="tab-content hidden">
-      ${colab ? renderDadosColab(colab) : '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Candidato ainda não preencheu os dados</h3></div>'}
+      ${colab ? renderDadosColab(colab) : '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Candidato ainda não preencheu os dados</div></div>'}
     </div>
     <div id="tab-content-documentos" class="tab-content hidden">
       ${renderDocumentosColab(colab?.documentos||[])}
@@ -1910,7 +1972,7 @@ async function abrirDetalheAdmissao(id) {
               <div class="tl-time">${new Date(t.created_at).toLocaleString('pt-BR')}</div>
             </div>
           </div>
-        `).join('') || '<div class="empty-state"><div class="empty-icon">📜</div><div class="empty-title">Nenhum evento registrado</h3></div>'}
+        `).join('') || '<div class="empty-state"><div class="empty-icon">📜</div><div class="empty-title">Nenhum evento registrado</div></div>'}
       </div>
     </div>
     <div id="tab-content-obs" class="tab-content hidden">
@@ -1921,7 +1983,7 @@ async function abrirDetalheAdmissao(id) {
           <div class="obs-texto">${o.texto}</div>
           <div class="obs-data">${new Date(o.created_at).toLocaleString('pt-BR')}</div>
         </div>
-      `).join('') || '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-title">Sem observações</h3></div>'}
+      `).join('') || '<div class="empty-state"><div class="empty-icon">💬</div><div class="empty-title">Sem observações</div></div>'}
     </div>`
 
     // Tabs
@@ -1934,7 +1996,7 @@ async function abrirDetalheAdmissao(id) {
       })
     })
   } catch(e) {
-    body.innerHTML = `<div class="empty-state"><h3>Erro ao carregar</div><p class="empty-desc">${e.message}</p></div>`
+    body.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Erro ao carregar</div><p class="empty-desc">${e.message}</p></div>`
   }
 }
 
@@ -2073,7 +2135,7 @@ document.getElementById('btn-salvar-obs').addEventListener('click', async () => 
 async function renderExportacao() {
   const main = document.getElementById('page-main')
   main.innerHTML = `
-  <div class="slide-up" style="max-width:720px;">
+  <div class="slide-up" style="max-width:100%;">
     <div class="card">
       <div class="card-header">
         <h3>Exportação Star Soft</h3>
@@ -2216,14 +2278,14 @@ async function renderDocumentos() {
                     <button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${d.id}')">✗ Reprovar</button>
                   </div>
                 </td>
-              </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state" style="padding:24px"><div class="e-icon">✅</div><div class="empty-title">Nenhum documento pendente</h3></div></td></tr>'}
+              </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state" style="padding:24px"><div class="e-icon">✅</div><div class="empty-title">Nenhum documento pendente</div></div></td></tr>'}
             </tbody>
           </table>
         </div>
       </div>
     </div>`
   } catch(e) {
-    main.innerHTML = `<div class="empty-state"><h3>Erro</div><p class="empty-desc">${e.message}</p></div>`
+    main.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Erro ao carregar</div><p class="empty-desc">${e.message}</p></div>`
   }
 }
 
@@ -2231,7 +2293,7 @@ async function renderDocumentos() {
 function renderConfiguracoes() {
   const main = document.getElementById('page-main')
   main.innerHTML = `
-  <div class="slide-up" style="max-width:680px;">
+  <div class="slide-up" style="max-width:100%;">
     <div class="card">
       <div class="card-header"><h3>Configurações do Sistema</h3></div>
       <div class="card-body">
@@ -2326,7 +2388,7 @@ function renderStepper() {
   const stepper = document.getElementById('stepper')
   stepper.innerHTML = ETAPAS.map((e, i) => {
     const state = e.num < APP.etapaAtual ? 'done' : e.num === APP.etapaAtual ? 'active' : 'pending'
-    const connector = i < ETAPAS.length - 1 ? `<div class="step-connector ${e.num < APP.etapaAtual ? 'done' : 'pending'}"></div>` : ''
+    const connector = i < ETAPAS.length - 1 ? `<div class="step-line ${e.num < APP.etapaAtual ? 'done' : 'pending'}"></div>` : ''
     return `
     <div class="step-item" onclick="if(${e.num} <= ${APP.etapaAtual}) renderEtapa(${e.num}).catch(console.error)">
       <div class="step-circle ${state}">${state === 'done' ? '✓' : e.num}</div>
@@ -2364,7 +2426,7 @@ function renderLGPD(container) {
   container.innerHTML = `
   <div class="lgpd-wrap">
     <div class="lgpd-card">
-      <div class="lgpd-header">
+      <div class="lgpd-head">
         <h2>🔒 Termo de Consentimento LGPD</h2>
         <p>Lei Geral de Proteção de Dados — Lei nº 13.709/2018</p>
       </div>
@@ -2378,10 +2440,10 @@ function renderLGPD(container) {
         <p><strong>Responsável pelo tratamento:</strong> Departamento de Recursos Humanos da empresa.</p>
         <p>Ao prosseguir, você declara ter lido e concordado com este termo de consentimento para o tratamento dos seus dados pessoais para fins de admissão.</p>
       </div>
-      <div class="lgpd-footer">
+      <div class="lgpd-foot">
         <div class="section-label">Assinatura Digital</div>
         <p style="font-size:12px;color:var(--gray500);margin-bottom:8px;">Assine no campo abaixo usando o dedo ou mouse:</p>
-        <div class="sig-canvas-wrap">
+        <div class="sig-wrap">
           <canvas id="sig-canvas"></canvas>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;">
@@ -2403,8 +2465,10 @@ function renderLGPD(container) {
   const ctx = canvas.getContext('2d')
   // Tamanho correto do canvas
   function resizeCanvas() { canvas.width = canvas.offsetWidth || 320; canvas.height = 120; }
-  resizeCanvas();
-  window.addEventListener("resize", resizeCanvas)
+  resizeCanvas()
+  // Usar AbortController para limpar o listener quando o usuário avançar
+  const _sigAbort = new AbortController()
+  window.addEventListener('resize', resizeCanvas, { signal: _sigAbort.signal })
   canvas.height = 120
   let drawing = false, lastX = 0, lastY = 0
 
@@ -2451,7 +2515,8 @@ function renderLGPD(container) {
     const btn = document.getElementById('btn-aceitar-lgpd')
     btn.disabled = true; btn.textContent = 'Registrando...'
     try {
-      // Registrar aceite
+      // Limpar listener de resize
+      _sigAbort.abort()
       await sb.from('aceite_lgpd').insert({
         convite_id: APP.conviteAtual.id,
         aceito: true,
@@ -2579,10 +2644,11 @@ async function salvarEtapa1() {
   const mae = document.getElementById('e1-mae').value.trim()
 
   if (!nome) { toast('Nome obrigatório.', 'warning'); return }
-  if (!cpf || !validarCPF(cpf)) { toast('CPF inválido.', 'error'); document.getElementById('e1-cpf').classList.add('error-field'); return }
-  if (!nascimento) { toast('Data de nascimento obrigatória.', 'warning'); _rb1(); return }
-  if (!rg) { toast('RG obrigatório.', 'warning'); _rb1(); return }
-  if (!mae) { toast('Nome da mãe obrigatório.', 'warning'); _rb1(); return }
+  document.getElementById('e1-cpf').classList.remove('error-field')
+  if (!cpf || !validarCPF(cpf)) { toast('CPF inválido.', 'error'); document.getElementById('e1-cpf').classList.add('error-field'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
+  if (!nascimento) { toast('Data de nascimento obrigatória.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
+  if (!rg) { toast('RG obrigatório.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
+  if (!mae) { toast('Nome da mãe obrigatório.', 'warning'); document.getElementById('btn-avancar-1').disabled=false; document.getElementById('btn-avancar-1').textContent='Salvar e Continuar →'; return }
 
   const dados = {
     nome_completo: nome, cpf, data_nascimento: nascimento,
@@ -2781,7 +2847,7 @@ function renderEtapa4(container) {
           </div>
         </div>
         <div class="divider"></div>
-        <div style="background:var(--warn-l);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:16px;">
+        <div style="background:var(--warn-l);border-left:3px solid var(--warn);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:16px;">
           <div style="font-size:12px;font-weight:700;color:#744210;margin-bottom:4px;">Dados da Vaga</div>
           <div style="font-size:13px;color:var(--gray700);"><b>Função:</b> ${c.funcao} &nbsp;|&nbsp; <b>Admissão:</b> ${c.data_admissao_prevista ? formatDate(c.data_admissao_prevista) : 'A definir'} &nbsp;|&nbsp; <b>Unidade:</b> ${c.obra_unidade||'—'}</div>
         </div>
@@ -2856,8 +2922,7 @@ function renderEtapa5(container) {
 }
 
 function selecionarBanco() {
-  const val = document.getElementById('e5-banco').value
-  if (val) { const [cod, nome] = val.split('|'); }
+  // banco selecionado é lido em salvarEtapa5 via document.getElementById('e5-banco').value
 }
 
 async function salvarEtapa5() {
@@ -3188,8 +3253,8 @@ async function finalizarAdmissao() {
       <p>Sua documentação foi enviada com sucesso ao departamento de RH. Em breve você receberá o retorno.</p>
       <div class="protocol-box">
         <div>
-          <div class="p-label">Protocolo</div>
-          <div class="p-code">${protocolo}</div>
+          <div class="protocol-label">Protocolo</div>
+          <div class="protocol-code">${protocolo}</div>
         </div>
       </div>
       <p style="font-size:12px;color:var(--gray400);margin-top:8px;">Guarde este número para referência futura.</p>
@@ -3200,35 +3265,55 @@ async function finalizarAdmissao() {
   }
 }
 
-// ── Auto Save com proteção race condition ──
+// ── Auto Save com fila para evitar race condition ──
 let _autoSaveInProgress = false
+let _autoSavePending = null
+
 async function autoSave(dados) {
   Object.assign(APP.dadosCandidato, dados)
-  if (_autoSaveInProgress) return
+  // Se já está salvando, guardar como pendente (será executado ao terminar)
+  if (_autoSaveInProgress) {
+    _autoSavePending = { ...APP.dadosCandidato }
+    return
+  }
   _autoSaveInProgress = true
+  try {
+    await _executarSave(dados)
+    // Se houve salvamento pendente enquanto estava ocupado, executar agora
+    if (_autoSavePending) {
+      const pending = _autoSavePending
+      _autoSavePending = null
+      await _executarSave(pending)
+    }
+  } finally {
+    _autoSaveInProgress = false
+  }
+}
+
+async function _executarSave(dados) {
   try {
     if (APP.colaboradorId) {
       const { error } = await sb.from('colaboradores').update({ ...dados, updated_at: new Date().toISOString() }).eq('id', APP.colaboradorId)
       if (error) throw error
     } else {
-      // Verificar se já existe antes de inserir (evitar duplicata em reconexão)
       const { data: existing } = await sb.from('colaboradores').select('id').eq('convite_id', APP.conviteAtual.id).maybeSingle()
       if (existing) {
         APP.colaboradorId = existing.id
         await sb.from('colaboradores').update({ ...dados, updated_at: new Date().toISOString() }).eq('id', existing.id)
       } else {
         const insertData = {}
-        Object.keys(APP.dadosCandidato).forEach(k => { if (APP.dadosCandidato[k] !== null && APP.dadosCandidato[k] !== undefined && k !== 'documentos' && k !== 'dependentes') insertData[k] = APP.dadosCandidato[k] })
+        Object.keys(APP.dadosCandidato).forEach(k => {
+          if (APP.dadosCandidato[k] !== null && APP.dadosCandidato[k] !== undefined && k !== 'documentos' && k !== 'dependentes')
+            insertData[k] = APP.dadosCandidato[k]
+        })
         insertData.convite_id = APP.conviteAtual.id
         const { data, error } = await sb.from('colaboradores').insert(insertData).select().single()
-        if (!error && data) { APP.colaboradorId = data.id }
+        if (!error && data) APP.colaboradorId = data.id
       }
     }
   } catch(e) {
     console.error('AutoSave error:', e)
     toast('Erro ao salvar progresso. Verifique sua conexão.', 'warning')
-  } finally {
-    _autoSaveInProgress = false
   }
 }
 
@@ -3239,11 +3324,12 @@ async function autoSave(dados) {
 function handleRoute() {
   const hash = window.location.hash
   if (hash.startsWith('#/admissao/')) {
-    const token = hash.replace('#/admissao/', '')
+    const token = hash.replace('#/admissao/', '').split('?')[0]
     if (token) {
+      // Se já está na página de candidato com o mesmo token, não reiniciar
+      if (APP.conviteAtual?.token === token) return
       if (APP.user) { showPage('app-layout'); return } // RH vendo link
       initCandidato(token)
-      return
     }
   }
 }
