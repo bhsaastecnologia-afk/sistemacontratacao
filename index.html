@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>RCONTRACT — Gestão de Admissões</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230E2140'/><text y='.9em' font-size='80' x='10' fill='%23C9A84C'>R</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -1305,7 +1306,7 @@ function renderPage(page) {
     exportacao: renderExportacao,
     configuracoes: renderConfiguracoes,
   }
-  if (pages[page]) pages[page]()
+  if (pages[page]) pages[page]().catch(e => { main.innerHTML = `<div class='empty-state'><div class='e-icon'>⚠️</div><h3>Erro ao carregar</h3><p>${e.message}</p></div>` })
   else main.innerHTML = '<div class="empty-state"><div class="e-icon">🚧</div><h3>Em Construção</h3><p>Esta página está em desenvolvimento.</p></div>'
 }
 
@@ -1405,7 +1406,7 @@ async function renderDashboard() {
                   </td>
                   <td style="font-size:12px;color:var(--gray500);font-family:var(--mono);">${formatDate(c.created_at)}</td>
                   <td>
-                    <button class="btn btn-ghost btn-sm" onclick="abrirDetalheAdmissao('${c.id}')">Ver</button>
+                    <button class="btn btn-ghost btn-sm" onclick="abrirDetalheAdmissao('${c.id}').catch(console.error)">Ver</button>
                   </td>
                 </tr>
               `).join('') || '<tr><td colspan="7"><div class="empty-state" style="padding:24px"><div class="e-icon">📭</div><h3>Nenhuma admissão ainda</h3><p>Crie o primeiro convite clicando em "Novo Convite".</p></div></td></tr>'}
@@ -1515,7 +1516,7 @@ async function loadAdmissoesTable() {
             <td style="font-size:11px;${vencido?'color:var(--error);font-weight:600;':''}">${formatDate(c.validade_ate)}</td>
             <td>
               <div style="display:flex;gap:4px;">
-                <button class="btn btn-outline btn-sm" onclick="abrirDetalheAdmissao('${c.id}')">Ver</button>
+                <button class="btn btn-outline btn-sm" onclick="abrirDetalheAdmissao('${c.id}').catch(console.error)">Ver</button>
                 <button class="btn btn-ghost btn-sm" onclick="copiarLink('${c.token}')" title="Copiar link">🔗</button>
               </div>
             </td>
@@ -1801,6 +1802,14 @@ function renderDadosColab(c) {
   const S = sanitizar
   const addrParts = [c.logradouro, c.numero, c.complemento, c.bairro].filter(Boolean)
   const cityPart = [c.cidade, c.estado].filter(Boolean).join('/')
+  const deps = c.dependentes || []
+  let depsHtml = ''
+  if (deps.length) {
+    depsHtml += '<div class="section-title">Dependentes (' + deps.length + ')</div>'
+    deps.forEach(d => {
+      depsHtml += '<div class="dado-item" style="margin-bottom:6px;"><div class="dado-val">' + S(d.nome) + ' — <span style="font-weight:400;color:var(--gray500);">' + S(d.parentesco) + ' | ' + formatDate(d.data_nascimento) + '</span></div></div>'
+    })
+  }
   return `
   <div>
     <div class="section-title">Dados Pessoais</div>
@@ -1817,7 +1826,7 @@ function renderDadosColab(c) {
     <div class="section-title">Endereço</div>
     <div class="dado-item" style="margin-bottom:16px;">
       <div class="dado-val" style="font-size:13px;font-weight:500;">
-        ${S(addrParts.join(', '))}${cityPart ? ' — '+S(cityPart) : ''}${c.cep ? ' | CEP '+c.cep : ''}
+        ${S(addrParts.join(', '))}${cityPart ? ' — ' + S(cityPart) : ''}${c.cep ? ' | CEP ' + c.cep : ''}
       </div>
     </div>
     <div class="section-title">Dados Bancários</div>
@@ -1827,14 +1836,8 @@ function renderDadosColab(c) {
       <div class="dado-item"><div class="dado-label">Conta</div><div class="dado-val">${S(c.conta)||'—'}</div></div>
       <div class="dado-item"><div class="dado-label">Tipo</div><div class="dado-val">${S(c.conta_tipo)||'—'}</div></div>
     </div>
-    ${(c.dependentes||[]).length ? \`
-    <div class="section-title">Dependentes (${(c.dependentes||[]).length})</div>
-    ${(c.dependentes||[]).map(d=>\`
-      <div class="dado-item" style="margin-bottom:6px;">
-        <div class="dado-val">\${S(d.nome)} — <span style="font-weight:400;color:var(--gray500);">\${S(d.parentesco)} | \${formatDate(d.data_nascimento)}</span></div>
-      </div>
-    \`).join('')}\` : ''}
-  </div>\`
+    ${depsHtml}
+  </div>`
 }
 
 
@@ -2185,7 +2188,7 @@ function renderStepper() {
     const state = e.num < APP.etapaAtual ? 'done' : e.num === APP.etapaAtual ? 'active' : 'pending'
     const connector = i < ETAPAS.length - 1 ? `<div class="step-connector ${e.num < APP.etapaAtual ? 'done' : 'pending'}"></div>` : ''
     return `
-    <div class="step-item" onclick="if(${e.num} <= ${APP.etapaAtual}) renderEtapa(${e.num})">
+    <div class="step-item" onclick="if(${e.num} <= ${APP.etapaAtual}) renderEtapa(${e.num}).catch(console.error)">
       <div class="step-circle ${state}">${state === 'done' ? '✓' : e.num}</div>
       <div class="step-label ${state}">${e.label}</div>
     </div>${connector}`
@@ -2333,7 +2336,7 @@ function renderLGPD(container) {
 function botoesNavegacao(numAtual, onAvancar) {
   return `
   <div style="display:flex;gap:10px;margin-top:24px;justify-content:space-between;flex-wrap:wrap;">
-    ${numAtual > 1 ? `<button class="btn btn-outline" onclick="renderEtapa(${numAtual-1})">← Voltar</button>` : '<div></div>'}
+    ${numAtual > 1 ? `<button class="btn btn-outline" onclick="renderEtapa(${numAtual-1}).catch(console.error)">← Voltar</button>` : '<div></div>'}
     <button class="btn btn-primary btn-lg" id="btn-avancar-${numAtual}" onclick="if(!this.disabled){this.disabled=true;this.textContent='Salvando...';${onAvancar}}" style="flex:1;max-width:280px;justify-content:center;">
       ${numAtual < 8 ? 'Salvar e Continuar →' : 'Enviar Documentação ✓'}
     </button>
@@ -2731,7 +2734,7 @@ async function salvarEtapa5() {
 // ── ETAPA 6: Dependentes ──
 async function renderEtapa6(container) {
   // Carregar dependentes do banco se não tiver em memória
-  if (!APP.dependentes.length && APP.colaboradorId) {
+  if (!(APP.dependentes||[]).length && APP.colaboradorId) {
     try {
       const { data: deps } = await sb.from('dependentes').select('*').eq('colaborador_id', APP.colaboradorId).order('ordem')
       if (deps && deps.length > 0) APP.dependentes = deps
@@ -2801,7 +2804,7 @@ async function salvarEtapa6() {
     data_nascimento: document.getElementById(`dep-${i}-nasc`)?.value || null,
   })).filter(d => d.nome)
 
-  if (APP.colaboradorId && APP.dependentes.length > 0) {
+  if (APP.colaboradorId && (APP.dependentes||[]).length > 0) {
     await sb.from('dependentes').delete().eq('colaborador_id', APP.colaboradorId)
     await sb.from('dependentes').insert(APP.dependentes.map((d,i) => ({ ...d, colaborador_id: APP.colaboradorId, ordem: i })))
   }
@@ -2855,18 +2858,17 @@ function removerFoto() { APP._fotoFile = null; APP.dadosCandidato.foto_url = nul
 
 async function salvarEtapa7() {
   if (APP._fotoFile && APP.colaboradorId) {
-    const btn = document.getElementById('btn-avancar-7')
-    if (btn) { btn.disabled = true; btn.textContent = 'Enviando foto...' }
+    const btn7 = document.getElementById('btn-avancar-7')
+    if (btn7) { btn7.disabled = true; btn7.textContent = 'Enviando foto...' }
     try {
       const fileComprimido = await comprimirImagem(APP._fotoFile, 800, 0.85)
       const path = `${APP.conviteAtual.id}/foto_perfil.jpg`
       const { error } = await sb.storage.from('admissoes').upload(path, fileComprimido, { upsert: true, contentType: 'image/jpeg' })
       if (error) throw error
-      // Armazenar path, não URL pública
       await autoSave({ foto_path: path, etapa_atual: 8 })
     } catch(e) {
       toast('Erro ao enviar foto: ' + e.message, 'error')
-      if (btn) { btn.disabled = false; btn.textContent = 'Salvar e Continuar →' }
+      const _b7 = document.getElementById('btn-avancar-7'); if (_b7) { _b7.disabled = false; _b7.textContent = 'Salvar e Continuar →' }
       return
     }
   } else {
@@ -2936,7 +2938,7 @@ async function renderEtapa8(container) {
     <div class="card">
       <div class="card-body">
         ${renderDocSection('📋 Documentos Pessoais', DOC_TIPOS.pessoal)}
-        ${APP.dependentes.length > 0 ? renderDocSection('👶 Documentos dos Dependentes', DOC_TIPOS.dependente) : ''}
+        ${(APP.dependentes||[]).length > 0 ? renderDocSection('👶 Documentos dos Dependentes', DOC_TIPOS.dependente) : ''}
         <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12px;color:#1E40AF;">
           <b>ℹ️ Dica:</b> Você pode tirar fotos dos documentos diretamente pelo celular. Certifique-se de que estejam legíveis e sem reflexo.
         </div>
@@ -3026,8 +3028,8 @@ async function uploadDoc(tipo, categoria, event) {
 }
 
 async function finalizarAdmissao() {
-  const btn = document.getElementById('btn-avancar-8')
-  btn.disabled = true; btn.textContent = 'Finalizando...'
+  const btn8 = document.getElementById('btn-avancar-8')
+  if (btn8) { btn8.disabled = true; btn8.textContent = 'Finalizando...' }
   try {
     await autoSave({ etapa_atual: 8 })
     await sb.from('convites').update({ status: 'em_analise', finalizado_em: new Date().toISOString() }).eq('id', APP.conviteAtual.id)
@@ -3054,7 +3056,7 @@ async function finalizarAdmissao() {
     </div>`
   } catch(e) {
     toast('Erro ao finalizar: ' + e.message, 'error')
-    btn.disabled = false; btn.textContent = 'Enviar Documentação ✓'
+    const _b8 = document.getElementById('btn-avancar-8'); if (_b8) { _b8.disabled = false; _b8.textContent = 'Enviar Documentação ✓' }
   }
 }
 
