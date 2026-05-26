@@ -1,0 +1,3127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RCONTRACT — Gestão de Admissões</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:    #0E2140;
+  --navy2:   #1A3660;
+  --navy3:   #1E4080;
+  --blue:    #2563EB;
+  --blue-l:  #3B82F6;
+  --sky:     #DBEAFE;
+  --gold:    #C9A84C;
+  --gold2:   #E8C56A;
+  --gold-l:  #FEF3C7;
+  --gold-d:  #92400E;
+  --white:   #FFFFFF;
+  --gray50:  #F8FAFC;
+  --gray100: #F1F5F9;
+  --gray200: #E2E8F0;
+  --gray300: #CBD5E1;
+  --gray400: #94A3B8;
+  --gray500: #64748B;
+  --gray600: #475569;
+  --gray700: #334155;
+  --gray800: #1E293B;
+  --success: #059669;
+  --error:   #DC2626;
+  --warn:    #D97706;
+  --font: 'Sora', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 3px rgba(14,33,64,.08), 0 4px 16px rgba(14,33,64,.06);
+  --shadow-lg: 0 4px 24px rgba(14,33,64,.12), 0 1px 4px rgba(14,33,64,.08);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--gray50); color: var(--gray800); min-height: 100vh; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: var(--font); }
+input, select, textarea { font-family: var(--font); }
+img { max-width: 100%; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray300); border-radius: 3px; }
+
+/* ── Utilities ── */
+.hidden { display: none !important; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.w-full { width: 100%; }
+.text-sm { font-size: 13px; }
+.text-xs { font-size: 11px; }
+.font-500 { font-weight: 500; }
+.font-600 { font-weight: 600; }
+.text-muted { color: var(--gray500); }
+.text-gold { color: var(--gold); }
+.text-navy { color: var(--navy); }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-4 { margin-top: 16px; }
+
+/* ── Loading overlay ── */
+#app-loading {
+  position: fixed; inset: 0; background: var(--navy);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; transition: opacity 0.4s;
+}
+#app-loading .logo-load {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.load-ring {
+  width: 48px; height: 48px; border: 3px solid rgba(201,168,76,.2);
+  border-top-color: var(--gold); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Toast container ── */
+#toast-container {
+  position: fixed; bottom: 16px; right: 16px; z-index: 8000;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  max-width: calc(100vw - 32px);
+}
+.toast {
+  background: var(--navy); color: white; padding: 12px 16px;
+  border-radius: var(--radius); font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px; min-width: 280px;
+  max-width: 360px; pointer-events: auto;
+  animation: toastIn 0.3s ease;
+  box-shadow: 0 4px 24px rgba(0,0,0,.25);
+}
+.toast.success { border-left: 3px solid var(--gold); }
+.toast.error   { border-left: 3px solid var(--error); }
+.toast.warning { border-left: 3px solid var(--warn); }
+.toast.info    { border-left: 3px solid var(--blue-l); }
+@keyframes toastIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes toastOut { to { transform: translateX(110%); opacity: 0; } }
+
+/* ═══════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════ */
+#page-login {
+  min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 768px) { #page-login { grid-template-columns: 1fr; } .login-brand { display: none; } }
+
+.login-brand {
+  background: var(--navy);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 60px 40px; position: relative; overflow: hidden;
+}
+.login-brand::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(37,99,235,.18) 0%, transparent 70%);
+}
+.login-brand::after {
+  content: ''; position: absolute; bottom: -80px; right: -80px;
+  width: 280px; height: 280px; border: 1px solid rgba(201,168,76,.12);
+  border-radius: 50%;
+}
+.brand-logo {
+  position: relative; z-index: 1; text-align: center; margin-bottom: 40px;
+}
+.brand-logo .logo-mark {
+  width: 72px; height: 72px; background: var(--gold);
+  border-radius: 16px; display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; font-size: 28px; font-weight: 700; color: var(--navy);
+  box-shadow: 0 0 32px rgba(201,168,76,.3);
+}
+.brand-logo h1 { font-size: 28px; font-weight: 700; color: white; letter-spacing: 3px; }
+.brand-logo p  { font-size: 12px; color: rgba(255,255,255,.5); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+.brand-features {
+  position: relative; z-index: 1; width: 100%; max-width: 320px;
+}
+.brand-feature {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.brand-feature .f-icon {
+  width: 32px; height: 32px; background: rgba(201,168,76,.12);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  color: var(--gold); font-size: 14px; flex-shrink: 0;
+}
+.brand-feature .f-text { font-size: 13px; color: rgba(255,255,255,.7); }
+
+.login-form-wrap {
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px 24px; background: white;
+  min-height: 100vh;
+}
+.login-card {
+  width: 100%; max-width: 400px;
+}
+.login-card h2 { font-size: 22px; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+.login-card .sub { font-size: 14px; color: var(--gray500); margin-bottom: 32px; }
+
+/* ── Form elements ── */
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 12px; font-weight: 600; color: var(--gray600); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 10px 14px; border: 1.5px solid var(--gray200);
+  border-radius: var(--radius); font-size: 14px; color: var(--gray800);
+  background: white; transition: border-color .2s, box-shadow .2s;
+  outline: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--navy3); box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+}
+.field input.error-field { border-color: var(--error); }
+.field-error { font-size: 11px; color: var(--error); margin-top: 4px; }
+.field input[readonly] { background: var(--gray50); color: var(--gray500); }
+
+/* ── Buttons ── */
+.btn {
+  padding: 10px 20px; border-radius: var(--radius); font-size: 14px; font-weight: 600;
+  border: none; display: inline-flex; align-items: center; gap: 8px;
+  transition: all .2s; white-space: nowrap;
+}
+.btn-primary {
+  background: var(--navy); color: white;
+}
+.btn-primary:hover { background: var(--navy2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(14,33,64,.2); }
+.btn-primary:active { transform: translateY(0); }
+.btn-gold {
+  background: var(--gold); color: var(--navy);
+}
+.btn-gold:hover { background: var(--gold2); transform: translateY(-1px); }
+.btn-outline {
+  background: transparent; color: var(--navy); border: 1.5px solid var(--gray200);
+}
+.btn-outline:hover { background: var(--gray50); border-color: var(--gray300); }
+.btn-ghost { background: transparent; color: var(--gray600); border: none; }
+.btn-ghost:hover { background: var(--gray100); color: var(--gray800); }
+.btn-danger { background: #FEE2E2; color: var(--error); border: none; }
+.btn-danger:hover { background: #FECACA; }
+.btn-sm { padding: 7px 14px; font-size: 12px; }
+.btn-lg { padding: 13px 28px; font-size: 15px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+.btn-loading::after {
+  content: ''; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3);
+  border-top-color: white; border-radius: 50%; animation: spin .7s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   LAYOUT ADMIN
+═══════════════════════════════════════════════ */
+#app-layout {
+  display: grid; grid-template-columns: 240px 1fr; min-height: 100vh;
+}
+@media (max-width: 1024px) { #app-layout { grid-template-columns: 1fr; } }
+
+/* ── Sidebar ── */
+#sidebar {
+  background: var(--navy); position: fixed; left: 0; top: 0; bottom: 0;
+  width: 240px; display: flex; flex-direction: column; z-index: 200;
+  transition: transform .3s ease;
+  overflow-y: auto;
+}
+@media (max-width: 1024px) {
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+}
+.sidebar-brand {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.sidebar-brand .logo-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.sidebar-brand .logo-box {
+  width: 36px; height: 36px; background: var(--gold); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 14px; color: var(--navy); flex-shrink: 0;
+}
+.sidebar-brand .logo-text { font-weight: 700; font-size: 16px; color: white; letter-spacing: 1.5px; }
+.sidebar-brand .logo-sub { font-size: 9px; color: rgba(255,255,255,.4); text-transform: uppercase; letter-spacing: 1.5px; }
+
+.sidebar-nav { flex: 1; padding: 12px 10px; overflow-y: auto; }
+.nav-section-label {
+  font-size: 9px; font-weight: 700; color: rgba(255,255,255,.3);
+  text-transform: uppercase; letter-spacing: 1.5px; padding: 12px 10px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,.65); transition: all .15s; margin-bottom: 2px;
+  border: none; background: transparent; width: 100%; text-align: left;
+}
+.nav-item:hover { background: rgba(255,255,255,.07); color: white; }
+.nav-item.active { background: rgba(201,168,76,.15); color: var(--gold); }
+.nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; background: var(--gold); color: var(--navy);
+  font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px;
+}
+
+.sidebar-user {
+  padding: 12px 16px; border-top: 1px solid rgba(255,255,255,.06);
+  display: flex; align-items: center; gap: 10px;
+}
+.user-avatar {
+  width: 32px; height: 32px; background: var(--navy3); border: 1.5px solid var(--gold);
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: var(--gold); flex-shrink: 0;
+}
+.user-info { min-width: 0; flex: 1; }
+.user-info .user-name { font-size: 12px; font-weight: 600; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-info .user-role { font-size: 10px; color: rgba(255,255,255,.4); }
+
+/* ── Main content ── */
+#main-content {
+  margin-left: 240px; min-height: 100vh; display: flex; flex-direction: column;
+  min-width: 0;
+}
+@media (max-width: 1024px) { #main-content { margin-left: 0; } }
+
+.topbar {
+  background: white; border-bottom: 1px solid var(--gray200);
+  padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 50; gap: 12px;
+}
+.topbar-left { display: flex; align-items: center; gap: 16px; }
+.topbar h2 { font-size: 17px; font-weight: 600; color: var(--navy); }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+
+.page-content { padding: 20px; flex: 1; }
+@media (max-width: 640px) { .page-content { padding: 12px; } }
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 640px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+}
+.stat-card {
+  background: white; border-radius: var(--radius-lg); padding: 16px 18px;
+  border: 1px solid var(--gray100); box-shadow: var(--shadow);
+  display: flex; flex-direction: column; gap: 8px;
+  transition: transform .2s, box-shadow .2s; cursor: default;
+}
+.stat-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.stat-icon {
+  width: 36px; height: 36px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 16px;
+}
+.stat-number { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1; }
+.stat-label { font-size: 12px; color: var(--gray500); font-weight: 500; }
+.stat-trend { font-size: 11px; color: var(--success); }
+
+/* ── Grid layout ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* ── Cards ── */
+.card {
+  background: white; border-radius: var(--radius-lg);
+  border: 1px solid var(--gray100); box-shadow: var(--shadow); overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--gray100);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header h3 { font-size: 14px; font-weight: 600; color: var(--navy); }
+.card-body { padding: 20px; }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  background: var(--gray50); padding: 10px 14px; text-align: left;
+  font-size: 11px; font-weight: 700; color: var(--gray500);
+  text-transform: uppercase; letter-spacing: .8px;
+  border-bottom: 1px solid var(--gray200); white-space: nowrap;
+}
+td {
+  padding: 12px 14px; border-bottom: 1px solid var(--gray100);
+  color: var(--gray700); vertical-align: middle;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--gray50); }
+
+/* ── Status badges ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+.badge-pendente   { background: var(--gold-l); color: var(--gold-d); }
+.badge-andamento  { background: var(--sky); color: #1E40AF; }
+.badge-completa   { background: #D1FAE5; color: #065F46; }
+.badge-reprovada  { background: #FEE2E2; color: #991B1B; }
+.badge-admitido   { background: var(--navy); color: var(--gold); }
+.badge-expirado   { background: var(--gray100); color: var(--gray600); }
+.badge-incompleta { background: #FFEDD5; color: #9A3412; }
+.badge-analise    { background: #F3E8FF; color: #6B21A8; }
+
+/* ── Search & filters ── */
+.search-bar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+}
+@media (max-width: 480px) {
+  .search-bar { flex-direction: column; align-items: stretch; }
+  select.filter-select { width: 100%; }
+}
+.search-input-wrap {
+  position: relative; flex: 1; min-width: 200px;
+}
+.search-input-wrap .s-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--gray400); font-size: 14px;
+}
+.search-input-wrap input {
+  width: 100%; padding: 9px 14px 9px 36px; border: 1.5px solid var(--gray200);
+  border-radius: var(--radius); font-size: 13px; outline: none;
+  transition: border-color .2s;
+}
+.search-input-wrap input:focus { border-color: var(--navy3); }
+select.filter-select {
+  padding: 9px 14px; border: 1.5px solid var(--gray200);
+  border-radius: var(--radius); font-size: 13px; outline: none; color: var(--gray700);
+  background: white; cursor: pointer;
+}
+
+/* ── Pagination ── */
+.pagination {
+  display: flex; align-items: center; justify-content: between; gap: 8px;
+  padding: 12px 0; flex-wrap: wrap;
+}
+.page-btn {
+  width: 32px; height: 32px; border-radius: 6px; border: 1.5px solid var(--gray200);
+  background: white; color: var(--gray600); font-size: 13px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all .15s;
+}
+.page-btn:hover { border-color: var(--navy3); color: var(--navy); }
+.page-btn.active { background: var(--navy); border-color: var(--navy); color: white; }
+.page-info { font-size: 12px; color: var(--gray500); }
+
+/* ═══════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(14,33,64,.5);
+  display: flex; align-items: flex-start; justify-content: center;
+  z-index: 500; padding: 12px; backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+.modal {
+  background: white; border-radius: var(--radius-lg);
+  width: 100%; max-width: 560px;
+  animation: modalIn .25s ease;
+  margin: auto;
+}
+.modal-lg { max-width: 720px; }
+.modal-xl { max-width: 900px; }
+@keyframes modalIn { from { opacity:0; transform: translateY(-16px) scale(.97); } to { opacity:1; transform: none; } }
+.modal-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--gray100);
+  display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: white; z-index: 1;
+}
+.modal-header h3 { font-size: 16px; font-weight: 600; color: var(--navy); }
+.modal-body { padding: 24px; }
+.modal-footer {
+  padding: 16px 24px; border-top: 1px solid var(--gray100);
+  display: flex; justify-content: flex-end; gap: 10px;
+}
+
+/* ═══════════════════════════════════════════════
+   CANDIDATO — STEPPER
+═══════════════════════════════════════════════ */
+#page-candidato {
+  min-height: 100vh; background: var(--gray50);
+}
+.cand-header {
+  background: var(--navy); padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cand-header .logo-row { display: flex; align-items: center; gap: 10px; }
+.cand-header .logo-box { width: 32px; height: 32px; background: var(--gold); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12px; color: var(--navy); }
+.cand-header .logo-text { font-weight: 700; font-size: 15px; color: white; letter-spacing: 1px; }
+.cand-header .cand-info { text-align: right; }
+.cand-header .cand-name { font-size: 13px; font-weight: 600; color: white; }
+.cand-header .cand-funcao { font-size: 11px; color: rgba(255,255,255,.5); }
+
+/* ── Stepper ── */
+.stepper-wrap {
+  background: white; border-bottom: 1px solid var(--gray200);
+  padding: 16px 20px; overflow-x: auto;
+}
+.stepper {
+  display: flex; align-items: center; min-width: max-content; gap: 0;
+}
+.step-item {
+  display: flex; align-items: center; gap: 0; cursor: pointer;
+}
+.step-circle {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0;
+  transition: all .2s;
+}
+.step-circle.done { background: var(--navy); color: var(--gold); }
+.step-circle.active { background: var(--gold); color: var(--navy); box-shadow: 0 0 0 4px rgba(201,168,76,.2); }
+.step-circle.pending { background: var(--gray100); color: var(--gray400); }
+.step-label {
+  font-size: 10px; font-weight: 600; white-space: nowrap; padding: 0 8px;
+  display: none;
+}
+@media (min-width: 640px) { .step-label { display: block; } }
+.step-label.active { color: var(--navy); }
+.step-label.done { color: var(--gray500); }
+.step-label.pending { color: var(--gray400); }
+.step-connector {
+  width: 32px; height: 2px; flex-shrink: 0;
+}
+.step-connector.done { background: var(--navy); }
+.step-connector.pending { background: var(--gray200); }
+
+/* ── Progress bar ── */
+.progress-bar-wrap { padding: 0 20px 12px; background: white; }
+.progress-bar-track {
+  height: 3px; background: var(--gray100); border-radius: 2px; overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%; background: linear-gradient(90deg, var(--navy3), var(--gold));
+  border-radius: 2px; transition: width .4s ease;
+}
+
+/* ── Form container ── */
+.form-container { max-width: 680px; margin: 0 auto; padding: 24px 16px; }
+
+/* ── LGPD screen ── */
+.lgpd-wrap {
+  max-width: 680px; margin: 0 auto; padding: 24px 16px;
+}
+.lgpd-card {
+  background: white; border-radius: var(--radius-lg); border: 1px solid var(--gray200);
+  overflow: hidden;
+}
+.lgpd-header { background: var(--navy); padding: 20px 24px; }
+.lgpd-header h2 { color: white; font-size: 18px; font-weight: 700; }
+.lgpd-header p  { color: rgba(255,255,255,.6); font-size: 13px; margin-top: 4px; }
+.lgpd-body { padding: 24px; max-height: 300px; overflow-y: auto; }
+.lgpd-body p { font-size: 13px; color: var(--gray700); line-height: 1.7; margin-bottom: 12px; }
+.lgpd-footer { padding: 20px 24px; border-top: 1px solid var(--gray100); }
+
+/* ── Signature canvas ── */
+.sig-canvas-wrap {
+  border: 2px dashed var(--gray300); border-radius: var(--radius);
+  background: var(--gray50); overflow: hidden; margin: 12px 0;
+}
+#sig-canvas { width: 100%; height: 120px; display: block; cursor: crosshair; touch-action: none; }
+
+/* ── Upload area ── */
+.upload-zone {
+  border: 2px dashed var(--gray300); border-radius: var(--radius);
+  padding: 32px 20px; text-align: center; cursor: pointer;
+  transition: all .2s; background: white;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--navy3); background: var(--sky);
+}
+.upload-zone .upload-icon { font-size: 32px; margin-bottom: 8px; }
+.upload-zone p { font-size: 13px; color: var(--gray500); }
+.upload-zone strong { color: var(--navy); }
+
+/* ── Doc checklist ── */
+.doc-checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 520px) { .doc-checklist { grid-template-columns: 1fr; } }
+.doc-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1.5px solid var(--gray200); border-radius: var(--radius);
+  font-size: 12px; font-weight: 500; background: white;
+}
+.doc-item.done { border-color: #A7F3D0; background: #ECFDF5; color: #065F46; }
+.doc-item.error { border-color: #FECACA; background: #FEF2F2; color: #991B1B; }
+.doc-item .doc-check { font-size: 16px; }
+
+/* ── Success screen ── */
+.success-wrap {
+  min-height: 60vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 40px 24px; text-align: center;
+}
+.success-circle {
+  width: 80px; height: 80px; background: var(--navy); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 24px;
+  animation: successPop .5s ease;
+}
+@keyframes successPop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.success-circle svg { width: 36px; height: 36px; color: var(--gold); }
+.success-wrap h2 { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
+.success-wrap p  { font-size: 14px; color: var(--gray500); max-width: 400px; margin-bottom: 20px; }
+.protocol-box {
+  background: var(--gray50); border: 1px solid var(--gray200); border-radius: var(--radius);
+  padding: 12px 20px; display: inline-flex; align-items: center; gap: 10px;
+}
+.protocol-box .p-label { font-size: 11px; font-weight: 700; color: var(--gray500); text-transform: uppercase; letter-spacing: .8px; }
+.protocol-box .p-code  { font-family: var(--mono); font-size: 15px; color: var(--navy); font-weight: 600; }
+
+/* ── Timeline ── */
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.timeline-item { display: flex; gap: 12px; padding: 0 0 16px; position: relative; }
+.timeline-line {
+  position: absolute; left: 15px; top: 30px; bottom: 0; width: 2px; background: var(--gray200);
+}
+.timeline-item:last-child .timeline-line { display: none; }
+.tl-dot {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 12px; z-index: 1;
+}
+.tl-body { flex: 1; padding-top: 4px; }
+.tl-body .tl-event { font-size: 13px; font-weight: 600; color: var(--gray800); }
+.tl-body .tl-desc  { font-size: 12px; color: var(--gray500); margin-top: 2px; }
+.tl-body .tl-time  { font-size: 11px; color: var(--gray400); margin-top: 2px; font-family: var(--mono); }
+
+/* ── Skeleton ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--gray100) 25%, var(--gray50) 50%, var(--gray100) 75%);
+  background-size: 200% 100%; border-radius: 4px;
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ── Responsivo mobile ── */
+#mobile-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150;
+  display: none;
+}
+#mobile-overlay.active { display: block; }
+.hamburger {
+  display: none; background: none; border: none; padding: 4px; cursor: pointer;
+}
+@media (max-width: 1024px) { .hamburger { display: flex; align-items: center; } }
+.hamburger span {
+  display: block; width: 20px; height: 2px; background: var(--gray600);
+  margin: 3px 0; transition: all .2s;
+}
+
+/* ── Chip / tag ── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 99px;
+  font-size: 11px; font-weight: 600; background: var(--sky); color: #1E40AF;
+}
+.chip.gold { background: var(--gold-l); color: var(--gold-d); }
+
+/* ── Section titles ── */
+.section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--gray400); margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--gray100);
+}
+
+/* Divider */
+.divider { height: 1px; background: var(--gray100); margin: 20px 0; }
+
+/* Input group */
+.input-group { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .input-group { grid-template-columns: 1fr; } }
+.input-group-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .input-group-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 380px) { .input-group-3 { grid-template-columns: 1fr; } }
+
+/* Checkbox custom */
+.checkbox-field { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.checkbox-field input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--navy); margin-top: 1px; flex-shrink: 0; cursor: pointer; }
+.checkbox-field span { font-size: 13px; color: var(--gray700); line-height: 1.5; }
+
+/* Empty state */
+.empty-state {
+  text-align: center; padding: 48px 20px;
+}
+.empty-state .e-icon { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 15px; font-weight: 600; color: var(--gray700); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; color: var(--gray500); }
+
+/* File preview */
+.file-preview-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: var(--gray50); border: 1px solid var(--gray200); border-radius: var(--radius);
+  margin-bottom: 8px;
+}
+.file-preview-item .f-icon-box {
+  width: 36px; height: 36px; background: var(--sky); border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+}
+.file-preview-item .f-info { flex: 1; min-width: 0; }
+.file-preview-item .f-name { font-size: 12px; font-weight: 600; color: var(--gray800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-preview-item .f-size { font-size: 11px; color: var(--gray500); }
+.file-preview-item .f-remove { background: none; border: none; color: var(--gray400); cursor: pointer; padding: 4px; border-radius: 4px; }
+.file-preview-item .f-remove:hover { color: var(--error); background: #FEE2E2; }
+
+/* Nota RH */
+.obs-item {
+  padding: 12px; background: var(--gray50); border-left: 3px solid var(--gold);
+  border-radius: 0 var(--radius) var(--radius) 0; margin-bottom: 10px;
+}
+.obs-item .obs-autor { font-size: 11px; font-weight: 700; color: var(--navy); }
+.obs-item .obs-texto { font-size: 13px; color: var(--gray700); margin-top: 4px; line-height: 1.5; }
+.obs-item .obs-data  { font-size: 10px; color: var(--gray400); margin-top: 4px; font-family: var(--mono); }
+
+/* Tabs */
+.tabs { display: flex; border-bottom: 2px solid var(--gray100); margin-bottom: 20px; gap: 0; overflow-x: auto; }
+.tab-btn {
+  padding: 10px 20px; font-size: 13px; font-weight: 600; color: var(--gray500);
+  border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; white-space: nowrap; transition: all .15s;
+}
+.tab-btn:hover { color: var(--navy); }
+.tab-btn.active { color: var(--navy); border-bottom-color: var(--gold); }
+
+/* Photo upload */
+.photo-upload-area {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 24px; border: 2px dashed var(--gray300); border-radius: var(--radius); cursor: pointer;
+  transition: all .2s;
+}
+.photo-upload-area:hover { border-color: var(--navy3); background: var(--sky); }
+.photo-preview {
+  width: 120px; height: 150px; object-fit: cover;
+  border-radius: 8px; border: 3px solid var(--navy); box-shadow: var(--shadow);
+}
+
+/* ── Animações ── */
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.slide-up { animation: slideUp .4s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+
+/* ── Dependent card ── */
+.dep-card {
+  border: 1.5px solid var(--gray200); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 12px; position: relative; background: white;
+}
+.dep-card .dep-num {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--navy); color: var(--gold); width: 22px; height: 22px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+.dep-card .dep-remove {
+  position: absolute; top: 10px; right: 40px;
+  background: none; border: none; color: var(--gray400); cursor: pointer; padding: 2px; border-radius: 4px;
+}
+.dep-card .dep-remove:hover { color: var(--error); background: #FEE2E2; }
+</style>
+</head>
+<body>
+
+<!-- ── Loading ── -->
+<div id="app-loading">
+  <div class="logo-load">
+    <div style="width:56px;height:56px;background:var(--gold);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:var(--navy);">R</div>
+    <div style="color:white;font-size:16px;font-weight:700;letter-spacing:3px;">RCONTRACT</div>
+    <div class="load-ring"></div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast-container"></div>
+
+<!-- ── Mobile overlay ── -->
+<div id="mobile-overlay"></div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: LOGIN
+══════════════════════════════════════════ -->
+<div id="page-login" class="hidden">
+  <div class="login-brand">
+    <div class="brand-logo">
+      <div class="logo-mark">R</div>
+      <h1>RCONTRACT</h1>
+      <p>Gestão de Admissões</p>
+    </div>
+    <div class="brand-features">
+      <div class="brand-feature">
+        <div class="f-icon">🔐</div>
+        <div class="f-text">Segurança de nível enterprise</div>
+      </div>
+      <div class="brand-feature">
+        <div class="f-icon">📋</div>
+        <div class="f-text">Formulário multietapas com auto-save</div>
+      </div>
+      <div class="brand-feature">
+        <div class="f-icon">📄</div>
+        <div class="f-text">Exportação compatível com Star Soft</div>
+      </div>
+      <div class="brand-feature">
+        <div class="f-icon">🏛️</div>
+        <div class="f-text">LGPD compliant com aceite digital</div>
+      </div>
+      <div class="brand-feature">
+        <div class="f-icon">📱</div>
+        <div class="f-text">100% responsivo — mobile first</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="login-form-wrap">
+    <div class="login-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+        <div style="width:36px;height:36px;background:var(--navy);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:var(--gold);">R</div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:var(--gray500);text-transform:uppercase;letter-spacing:1px;">Sistema RH</div>
+          <div style="font-size:15px;font-weight:700;color:var(--navy);">RCONTRACT</div>
+        </div>
+      </div>
+      <h2>Acesso Administrativo</h2>
+      <p class="sub">Entre com suas credenciais do departamento de RH</p>
+
+      <div id="login-error" class="hidden" style="background:#FEE2E2;border:1px solid #FECACA;border-radius:8px;padding:10px 14px;font-size:13px;color:#991B1B;margin-bottom:16px;display:flex;align-items:center;gap:8px;">
+        <span>⚠</span><span id="login-error-msg"></span>
+      </div>
+
+      <div class="field">
+        <label>E-mail</label>
+        <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <div style="position:relative;">
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" style="padding-right:40px;">
+          <button type="button" id="toggle-pass" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--gray400);cursor:pointer;font-size:16px;" title="Ver senha">👁</button>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg w-full" id="btn-login" style="margin-top:8px;justify-content:center;">
+        Entrar no Sistema
+      </button>
+
+      <button class="btn btn-ghost w-full" id="btn-forgot" style="margin-top:10px;justify-content:center;font-size:13px;">
+        Esqueci minha senha
+      </button>
+
+      <div id="forgot-section" class="hidden" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--gray100);">
+        <p style="font-size:13px;color:var(--gray500);margin-bottom:12px;">Digite seu e-mail para receber o link de recuperação:</p>
+        <div class="field">
+          <input type="email" id="forgot-email" placeholder="seu@email.com">
+        </div>
+        <button class="btn btn-outline w-full" id="btn-reset" style="justify-content:center;">Enviar link de recuperação</button>
+      </div>
+
+      <p style="font-size:11px;color:var(--gray400);text-align:center;margin-top:24px;">
+        Sistema privado interno — acesso restrito ao RH
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: ADMIN LAYOUT
+══════════════════════════════════════════ -->
+<div id="app-layout" class="hidden">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo-row">
+        <div class="logo-box">R</div>
+        <div>
+          <div class="logo-text">RCONTRACT</div>
+          <div class="logo-sub">Gestão de Admissões</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <button class="nav-item active" data-page="dashboard">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" data-page="admissoes">
+        <span class="nav-icon">👥</span> Admissões
+        <span class="nav-badge" id="badge-pendentes">0</span>
+      </button>
+      <button class="nav-item" data-page="novo-convite">
+        <span class="nav-icon">➕</span> Novo Convite
+      </button>
+
+      <div class="nav-section-label">Gestão</div>
+      <button class="nav-item" data-page="documentos">
+        <span class="nav-icon">📁</span> Documentos
+      </button>
+      <button class="nav-item" data-page="exportacao">
+        <span class="nav-icon">📤</span> Exportação
+      </button>
+
+      <div class="nav-section-label">Sistema</div>
+      <button class="nav-item" data-page="configuracoes">
+        <span class="nav-icon">⚙️</span> Configurações
+      </button>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="user-avatar" id="user-avatar-initials">RH</div>
+      <div class="user-info">
+        <div class="user-name" id="sidebar-user-name">Carregando...</div>
+        <div class="user-role" id="sidebar-user-role">RH</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-logout" title="Sair" style="margin-left:auto;padding:6px;color:rgba(255,255,255,.4);">↩</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div id="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger">
+          <span></span><span></span><span></span>
+        </button>
+        <div>
+          <h2 id="page-title">Dashboard</h2>
+          <p style="font-size:11px;color:var(--gray400);margin-top:1px;" id="page-subtitle">Visão geral das admissões</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-gold btn-sm" data-page="novo-convite">
+          ➕ Novo Convite
+        </button>
+      </div>
+    </header>
+
+    <main class="page-content" id="page-main">
+      <!-- Conteúdo dinâmico aqui -->
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PAGE: CANDIDATO (formulário)
+══════════════════════════════════════════ -->
+<div id="page-candidato" class="hidden">
+  <header class="cand-header">
+    <div class="logo-row">
+      <div class="logo-box">R</div>
+      <div class="logo-text">RCONTRACT</div>
+    </div>
+    <div class="cand-info">
+      <div class="cand-name" id="cand-nome-header">—</div>
+      <div class="cand-funcao" id="cand-funcao-header">—</div>
+    </div>
+  </header>
+
+  <!-- Stepper -->
+  <div class="stepper-wrap" id="stepper-container">
+    <div class="stepper" id="stepper"></div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Conteúdo do formulário -->
+  <div id="cand-content"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAIS
+══════════════════════════════════════════ -->
+
+<!-- Modal: Detalhe admissão -->
+<div class="modal-overlay hidden" id="modal-detalhe">
+  <div class="modal modal-xl">
+    <div class="modal-header">
+      <h3>Detalhes da Admissão</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-detalhe')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-detalhe-body">
+      <!-- Conteúdo dinâmico -->
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Observação RH -->
+<div class="modal-overlay hidden" id="modal-obs">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Adicionar Observação</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-obs')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>Observação Interna</label>
+        <textarea id="obs-texto" rows="4" placeholder="Escreva a observação para este candidato..." style="resize:vertical;"></textarea>
+      </div>
+      <label class="checkbox-field">
+        <input type="checkbox" id="obs-visivel">
+        <span>Visível para o candidato</span>
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-obs')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-obs">Salvar Observação</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Reprovação de documento -->
+<div class="modal-overlay hidden" id="modal-reprovar-doc">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Reprovar Documento</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('modal-reprovar-doc')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--gray600);margin-bottom:16px;">Informe o motivo da reprovação para que o candidato possa corrigir.</p>
+      <div class="field">
+        <label>Motivo</label>
+        <textarea id="reprovar-motivo" rows="3" placeholder="Ex: Documento ilegível, data incorreta..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-reprovar-doc')">Cancelar</button>
+      <button class="btn btn-danger" id="btn-confirmar-reprovar">Reprovar Documento</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════
+// RCONTRACT — Main Application
+// ════════════════════════════════════════════════════════════════
+
+// ── Configuração Supabase ────────────────────────────────────────
+// SUBSTITUA com suas credenciais do Supabase
+const SUPABASE_URL = 'https://vzabrxstjcunmbeozilx.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ6YWJyeHN0amN1bm1iZW96aWx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3MzgzODAsImV4cCI6MjA5NTMxNDM4MH0.pk8V_owviiRAnPTGebikCv1CL_g2xd_6uNvDDwDza-g'
+
+// Verificar se Supabase carregou
+if (typeof supabase === 'undefined') {
+  document.getElementById('app-loading').innerHTML = '<div style="color:white;text-align:center;padding:40px;"><div style="font-size:48px;margin-bottom:16px;">⚠️</div><div style="font-size:16px;font-weight:600;">Erro de conexão</div><div style="font-size:13px;opacity:.7;margin-top:8px;">Verifique sua internet e recarregue a página.</div><button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;background:#C9A84C;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Recarregar</button></div>'
+  throw new Error('Supabase não carregou')
+}
+const { createClient } = supabase
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+})
+
+// ── Estado global ─────────────────────────────────────────────────
+const APP = {
+  user: null,
+  profile: null,
+  currentPage: 'dashboard',
+  conviteAtual: null,
+  colaboradorId: null,
+  etapaAtual: 0,
+  totalEtapas: 8,
+  dadosCandidato: {},
+  dependentes: [],
+  documentos: {},
+}
+
+// ════════════════════════════════════════════════════════════════
+// UTILS
+// ════════════════════════════════════════════════════════════════
+
+function toast(msg, type = 'success') {
+  const container = document.getElementById('toast-container')
+  const icons = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' }
+  const borders = { success: 'var(--gold)', error: 'var(--error)', warning: 'var(--warn)', info: 'var(--blue-l)' }
+  const el = document.createElement('div')
+  el.className = `toast ${type}`
+  el.style.borderLeftColor = borders[type] || borders.info
+  el.innerHTML = `<span style="font-size:15px">${icons[type]||icons.info}</span><span>${msg}</span>`
+  container.appendChild(el)
+  setTimeout(() => { el.style.animation = 'toastOut .3s ease forwards'; setTimeout(() => el.remove(), 300) }, 3500)
+}
+
+function showPage(pageId) {
+  ['page-login','app-layout','page-candidato'].forEach(p => {
+    document.getElementById(p).classList.add('hidden')
+  })
+  document.getElementById(pageId).classList.remove('hidden')
+}
+
+function openModal(id) { document.getElementById(id).classList.remove('hidden') }
+function closeModal(id) { document.getElementById(id).classList.add('hidden') }
+
+function formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('pt-BR') }
+function formatMoney(v) { if (!v) return '—'; return new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(v) }
+function formatCPF(c) { if (!c) return '—'; const s = c.replace(/\D/g,''); return s.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/,'$1.$2.$3-$4') }
+function formatPhone(p) { if (!p) return '—'; const s = p.replace(/\D/g,''); return s.length === 11 ? s.replace(/(\d{2})(\d{5})(\d{4})/,'($1) $2-$3') : s.replace(/(\d{2})(\d{4})(\d{4})/,'($1) $2-$3') }
+
+function validarTelefone(tel) {
+  const t = tel.replace(/\D/g,'')
+  return t.length >= 10 && t.length <= 11
+}
+
+function validarEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+function sanitizar(str) {
+  if (!str) return ''
+  return String(str).replace(/[<>'"&]/g, c => ({'<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;','&':'&amp;'}[c]))
+}
+
+function validarCPF(cpf) {
+  const c = cpf.replace(/\D/g,'')
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false
+  let s = 0
+  for (let i = 0; i < 9; i++) s += parseInt(c[i]) * (10 - i)
+  let r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  if (r !== parseInt(c[9])) return false
+  s = 0
+  for (let i = 0; i < 10; i++) s += parseInt(c[i]) * (11 - i)
+  r = (s * 10) % 11; if (r === 10 || r === 11) r = 0
+  return r === parseInt(c[10])
+}
+
+function applyMask(el, type) {
+  const masks = {
+    cpf: v => v.replace(/\D/g,'').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2').slice(0,14),
+    telefone: v => v.replace(/\D/g,'').replace(/(\d{2})(\d)/,'($1) $2').replace(/(\d{4,5})(\d{4})$/,'$1-$2').slice(0,15),
+    cep: v => v.replace(/\D/g,'').replace(/(\d{5})(\d)/,'$1-$2').slice(0,9),
+    data: v => v.replace(/\D/g,'').replace(/(\d{2})(\d)/,'$1/$2').replace(/(\d{2})(\d)/,'$1/$2').slice(0,10),
+    pis: v => v.replace(/\D/g,'').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{5})(\d)/,'$1.$2').replace(/(\d{4})(\d)/,'$1-$2').slice(0,14),
+    money: v => { const n = v.replace(/\D/g,''); const f = (parseInt(n||0)/100).toFixed(2); return f.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.') },
+  }
+  if (masks[type]) el.addEventListener('input', e => { const pos = e.target.selectionStart; const raw = e.target.value; e.target.value = masks[type](raw) })
+}
+
+function statusBadge(status) {
+  const cfg = {
+    pendente:                { label:'Pendente',        cls:'badge-pendente' },
+    em_andamento:            { label:'Em Andamento',    cls:'badge-andamento' },
+    documentacao_incompleta: { label:'Doc. Incompleta', cls:'badge-incompleta' },
+    em_analise:              { label:'Em Análise',      cls:'badge-analise' },
+    completa:                { label:'Completa',        cls:'badge-completa' },
+    aprovada:                { label:'Aprovada',        cls:'badge-completa' },
+    reprovada:               { label:'Reprovada',       cls:'badge-reprovada' },
+    admitido:                { label:'Admitido',        cls:'badge-admitido' },
+    expirado:                { label:'Expirado',        cls:'badge-expirado' },
+  }
+  const c = cfg[status] || cfg.pendente
+  return `<span class="badge ${c.cls}">${c.label}</span>`
+}
+
+function gerarProtocolo() {
+  const d = new Date()
+  return `RCT-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-${Math.floor(Math.random()*90000+10000)}`
+}
+
+// ════════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════════
+
+function hideLoading() {
+  const el = document.getElementById('app-loading')
+  if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => { if(el) el.style.display = 'none' }, 350) }
+}
+
+// Promise com timeout — evita travar para sempre
+function withTimeout(promise, ms, fallback) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]).catch(() => fallback)
+}
+
+async function initAuth() {
+  // Verificar se é link de candidato ANTES de qualquer chamada ao Supabase
+  // Isso garante que candidatos sem internet também vejam algo
+  const hash = window.location.hash
+  if (hash.includes('/admissao/')) {
+    const token = hash.split('/admissao/')[1]?.split('?')[0]
+    if (token) {
+      hideLoading()
+      initCandidato(token)
+      return
+    }
+  }
+
+  try {
+    // Timeout de 8s na chamada ao Supabase
+    const result = await withTimeout(
+      sb.auth.getSession(),
+      8000,
+      { data: { session: null }, error: null }
+    )
+    const session = result?.data?.session
+
+    if (session?.user) {
+      APP.user = session.user
+      try { await withTimeout(loadProfile(), 5000, null) } catch(e) { console.warn('loadProfile:', e) }
+      showPage('app-layout')
+      initAdmin()
+    } else {
+      showPage('page-login')
+    }
+  } catch(e) {
+    console.error('initAuth:', e)
+    showPage('page-login')
+  } finally {
+    hideLoading()
+  }
+}
+
+async function loadProfile() {
+  const { data } = await sb.from('perfis').select('*').eq('id', APP.user.id).maybeSingle()
+  if (data) {
+    APP.profile = data
+    const initials = data.nome.split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()
+    document.getElementById('user-avatar-initials').textContent = initials
+    document.getElementById('sidebar-user-name').textContent = data.nome
+    document.getElementById('sidebar-user-role').textContent = data.role === 'admin_rh' ? 'Admin RH' : 'Visualizador'
+  }
+}
+
+// ── Login ──
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim()
+  const password = document.getElementById('login-password').value
+  if (!email || !password) { toast('Preencha e-mail e senha.', 'error'); return }
+  const btn = document.getElementById('btn-login')
+  btn.disabled = true; btn.classList.add('btn-loading'); btn.textContent = ''
+  const errEl = document.getElementById('login-error')
+  errEl.classList.add('hidden')
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    APP.user = data.user
+    await loadProfile()
+    showPage('app-layout')
+    initAdmin()
+    toast('Bem-vindo ao RCONTRACT!', 'success')
+  } catch (e) {
+    document.getElementById('login-error-msg').textContent = 'E-mail ou senha incorretos. Tente novamente.'
+    errEl.classList.remove('hidden')
+    toast('Credenciais inválidas.', 'error')
+  } finally {
+    btn.disabled = false; btn.classList.remove('btn-loading'); btn.textContent = 'Entrar no Sistema'
+  }
+})
+
+document.getElementById('toggle-pass').addEventListener('click', () => {
+  const inp = document.getElementById('login-password')
+  inp.type = inp.type === 'password' ? 'text' : 'password'
+})
+
+document.getElementById('btn-forgot').addEventListener('click', () => {
+  document.getElementById('forgot-section').classList.toggle('hidden')
+})
+
+document.getElementById('btn-reset').addEventListener('click', async () => {
+  const email = document.getElementById('forgot-email').value.trim()
+  if (!email) { toast('Digite seu e-mail.', 'warning'); return }
+  try {
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    toast('Link de recuperação enviado!', 'success')
+  } catch (e) { toast('Erro ao enviar link.', 'error') }
+})
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await sb.auth.signOut()
+  APP.user = null; APP.profile = null
+  showPage('page-login')
+  toast('Sessão encerrada.', 'info')
+})
+
+// ── Sidebar ──
+document.getElementById('hamburger').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open')
+  document.getElementById('mobile-overlay').classList.toggle('active')
+})
+document.getElementById('mobile-overlay').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.remove('open')
+  document.getElementById('mobile-overlay').classList.remove('active')
+})
+
+document.querySelectorAll('[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const page = btn.dataset.page
+    navigateTo(page)
+    document.getElementById('sidebar').classList.remove('open')
+    document.getElementById('mobile-overlay').classList.remove('active')
+  })
+})
+
+function navigateTo(page) {
+  APP.currentPage = page
+  document.querySelectorAll('.nav-item').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === page)
+  })
+  const titles = {
+    dashboard: ['Dashboard', 'Visão geral das admissões'],
+    admissoes: ['Admissões', 'Gerenciar todos os processos'],
+    'novo-convite': ['Novo Convite', 'Cadastrar candidato e gerar link'],
+    documentos: ['Documentos', 'Gestão de documentação'],
+    exportacao: ['Exportação', 'Exportar dados para Star Soft'],
+    configuracoes: ['Configurações', 'Configurações do sistema'],
+  }
+  const [title, sub] = titles[page] || ['Sistema', '']
+  document.getElementById('page-title').textContent = title
+  document.getElementById('page-subtitle').textContent = sub
+  renderPage(page)
+}
+
+// ════════════════════════════════════════════════════════════════
+// ADMIN — PÁGINAS
+// ════════════════════════════════════════════════════════════════
+
+function initAdmin() {
+  navigateTo('dashboard')
+  loadDashboardBadge()
+}
+
+async function loadDashboardBadge() {
+  const { count } = await sb.from('convites').select('*', { count:'exact', head:true }).eq('status','pendente').is('deleted_at',null)
+  document.getElementById('badge-pendentes').textContent = count || 0
+}
+
+function renderPage(page) {
+  const main = document.getElementById('page-main')
+  main.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:60px;"><div class="load-ring" style="border-color:rgba(14,33,64,.1);border-top-color:var(--navy);"></div></div>'
+  const pages = {
+    dashboard: renderDashboard,
+    admissoes: renderAdmissoes,
+    'novo-convite': renderNovoConvite,
+    documentos: renderDocumentos,
+    exportacao: renderExportacao,
+    configuracoes: renderConfiguracoes,
+  }
+  if (pages[page]) pages[page]()
+  else main.innerHTML = '<div class="empty-state"><div class="e-icon">🚧</div><h3>Em Construção</h3><p>Esta página está em desenvolvimento.</p></div>'
+}
+
+// ── DASHBOARD ──
+async function renderDashboard() {
+  const main = document.getElementById('page-main')
+  try {
+    const { data: convites } = await sb.from('convites').select('status, created_at, validade_ate').is('deleted_at', null)
+    const hoje = new Date(); hoje.setHours(0,0,0,0)
+    const stats = {
+      hoje: convites.filter(c => new Date(c.created_at) >= hoje).length,
+      pendentes: convites.filter(c => c.status === 'pendente').length,
+      andamento: convites.filter(c => c.status === 'em_andamento').length,
+      completas: convites.filter(c => ['completa','aprovada','admitido'].includes(c.status)).length,
+      expirados: convites.filter(c => c.status === 'expirado' || new Date(c.validade_ate) < new Date()).length,
+      incompletas: convites.filter(c => c.status === 'documentacao_incompleta').length,
+      total: convites.length,
+    }
+
+    // Últimas admissões
+    const { data: recentes } = await sb.from('convites')
+      .select('*, colaboradores(etapa_atual)')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(8)
+
+    main.innerHTML = `
+    <div class="slide-up">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EFF6FF;font-size:20px;">📅</div>
+          <div class="stat-number">${stats.hoje}</div>
+          <div class="stat-label">Criados Hoje</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--gold-l);font-size:20px;">⏳</div>
+          <div class="stat-number" style="color:var(--gold-d);">${stats.pendentes}</div>
+          <div class="stat-label">Pendentes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EFF6FF;font-size:20px;">📝</div>
+          <div class="stat-number" style="color:#1E40AF;">${stats.andamento}</div>
+          <div class="stat-label">Em Andamento</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#D1FAE5;font-size:20px;">✅</div>
+          <div class="stat-number" style="color:#065F46;">${stats.completas}</div>
+          <div class="stat-label">Completas</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#FFEDD5;font-size:20px;">⚠️</div>
+          <div class="stat-number" style="color:#9A3412;">${stats.incompletas}</div>
+          <div class="stat-label">Doc. Incompleta</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--gray100);font-size:20px;">⏰</div>
+          <div class="stat-number" style="color:var(--gray500);">${stats.expirados}</div>
+          <div class="stat-label">Expirados</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>🕐 Últimas Admissões</h3>
+          <button class="btn btn-outline btn-sm" onclick="navigateTo('admissoes')">Ver todas →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Candidato</th>
+                <th>Função</th>
+                <th>Unidade</th>
+                <th>Status</th>
+                <th>Progresso</th>
+                <th>Criado em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentes.map(c => `
+                <tr>
+                  <td>
+                    <div style="font-weight:600;color:var(--navy)">${c.candidato_nome}</div>
+                    <div style="font-size:11px;color:var(--gray400)">${c.candidato_email}</div>
+                  </td>
+                  <td>${c.funcao || '—'}</td>
+                  <td>${c.obra_unidade || '—'}</td>
+                  <td>${statusBadge(c.status)}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                      <div style="flex:1;height:4px;background:var(--gray100);border-radius:2px;overflow:hidden;">
+                        <div style="height:100%;background:var(--navy);width:${Math.min(((c.colaboradores?.etapa_atual||0)/8)*100,100)}%;border-radius:2px;"></div>
+                      </div>
+                      <span style="font-size:11px;color:var(--gray500);font-family:var(--mono);">${c.colaboradores?.etapa_atual||0}/8</span>
+                    </div>
+                  </td>
+                  <td style="font-size:12px;color:var(--gray500);font-family:var(--mono);">${formatDate(c.created_at)}</td>
+                  <td>
+                    <button class="btn btn-ghost btn-sm" onclick="abrirDetalheAdmissao('${c.id}')">Ver</button>
+                  </td>
+                </tr>
+              `).join('') || '<tr><td colspan="7"><div class="empty-state" style="padding:24px"><div class="e-icon">📭</div><h3>Nenhuma admissão ainda</h3><p>Crie o primeiro convite clicando em "Novo Convite".</p></div></td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`
+  } catch(e) {
+    main.innerHTML = `<div class="empty-state"><div class="e-icon">⚠️</div><h3>Erro ao carregar dashboard</h3><p>${e.message}</p></div>`
+  }
+}
+
+// ── ADMISSÕES ──
+let admPage = 1, admSearch = '', admStatus = ''
+
+async function renderAdmissoes() {
+  const main = document.getElementById('page-main')
+  main.innerHTML = `
+  <div class="slide-up">
+    <div class="card">
+      <div class="card-header">
+        <h3>Todos os Processos</h3>
+        <button class="btn btn-gold btn-sm" onclick="navigateTo('novo-convite')">➕ Novo Convite</button>
+      </div>
+      <div class="card-body" style="padding-bottom:0;">
+        <div class="search-bar">
+          <div class="search-input-wrap">
+            <span class="s-icon">🔍</span>
+            <input type="text" id="adm-search" placeholder="Buscar por nome, e-mail, função..." value="${admSearch}">
+          </div>
+          <select class="filter-select" id="adm-filter">
+            <option value="">Todos os status</option>
+            <option value="pendente">Pendente</option>
+            <option value="em_andamento">Em Andamento</option>
+            <option value="documentacao_incompleta">Doc. Incompleta</option>
+            <option value="em_analise">Em Análise</option>
+            <option value="completa">Completa</option>
+            <option value="aprovada">Aprovada</option>
+            <option value="reprovada">Reprovada</option>
+            <option value="admitido">Admitido</option>
+            <option value="expirado">Expirado</option>
+          </select>
+          <button class="btn btn-outline btn-sm" id="btn-buscar-adm">Buscar</button>
+        </div>
+      </div>
+      <div id="adm-table-wrap" class="table-wrap">
+        <div style="padding:40px;text-align:center;"><div class="load-ring" style="margin:0 auto;border-top-color:var(--navy);"></div></div>
+      </div>
+      <div class="card-body" style="padding-top:8px;">
+        <div class="pagination" id="adm-pagination"></div>
+      </div>
+    </div>
+  </div>`
+
+  document.getElementById('adm-filter').value = admStatus
+  document.getElementById('adm-search').value = admSearch
+  document.getElementById('btn-buscar-adm').addEventListener('click', () => {
+    admSearch = document.getElementById('adm-search').value
+    admStatus = document.getElementById('adm-filter').value
+    admPage = 1
+    loadAdmissoesTable()
+  })
+  document.getElementById('adm-search').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btn-buscar-adm').click() })
+
+  await loadAdmissoesTable()
+}
+
+async function loadAdmissoesTable() {
+  const wrap = document.getElementById('adm-table-wrap')
+  wrap.innerHTML = '<div style="padding:40px;text-align:center;"><div class="load-ring" style="margin:0 auto;border-top-color:var(--navy);"></div></div>'
+  try {
+    let query = sb.from('convites').select('*, colaboradores(etapa_atual)', { count:'exact' }).is('deleted_at',null).order('created_at',{ ascending:false }).range((admPage-1)*15, admPage*15-1)
+    if (admSearch) query = query.or(`candidato_nome.ilike.%${admSearch}%,candidato_email.ilike.%${admSearch}%,funcao.ilike.%${admSearch}%`)
+    if (admStatus) query = query.eq('status', admStatus)
+    const { data, count, error } = await query
+    if (error) throw error
+
+    wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Candidato</th><th>Função</th><th>Unidade</th><th>Admissão</th>
+        <th>Status</th><th>Progresso</th><th>Validade</th><th>Ações</th>
+      </tr></thead>
+      <tbody>
+        ${(data||[]).map(c => {
+          const vencido = new Date(c.validade_ate) < new Date()
+          const etapa = c.colaboradores?.etapa_atual || 0
+          const pct = Math.min((etapa/8)*100, 100)
+          return `<tr>
+            <td>
+              <div style="font-weight:600;color:var(--navy);">${c.candidato_nome}</div>
+              <div style="font-size:11px;color:var(--gray400);">${c.candidato_email}</div>
+            </td>
+            <td style="font-size:13px;">${c.funcao||'—'}</td>
+            <td style="font-size:13px;">${c.obra_unidade||'—'}</td>
+            <td style="font-size:12px;font-family:var(--mono);">${c.data_admissao_prevista ? formatDate(c.data_admissao_prevista) : '—'}</td>
+            <td>${statusBadge(c.status)}</td>
+            <td>
+              <div style="min-width:80px;">
+                <div style="height:4px;background:var(--gray100);border-radius:2px;overflow:hidden;margin-bottom:3px;">
+                  <div style="height:100%;background:var(--navy);width:${pct}%;"></div>
+                </div>
+                <div style="font-size:10px;color:var(--gray500);font-family:var(--mono);">${etapa}/8 etapas</div>
+              </div>
+            </td>
+            <td style="font-size:11px;${vencido?'color:var(--error);font-weight:600;':''}">${formatDate(c.validade_ate)}</td>
+            <td>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-outline btn-sm" onclick="abrirDetalheAdmissao('${c.id}')">Ver</button>
+                <button class="btn btn-ghost btn-sm" onclick="copiarLink('${c.token}')" title="Copiar link">🔗</button>
+              </div>
+            </td>
+          </tr>`
+        }).join('') || '<tr><td colspan="8"><div class="empty-state" style="padding:24px"><div class="e-icon">🔍</div><h3>Nenhum resultado</h3></div></td></tr>'}
+      </tbody>
+    </table>`
+
+    // Paginação
+    const totalPages = Math.ceil((count||0)/15)
+    let pagHtml = `<span class="page-info">${count||0} registros</span>`
+    for (let i = 1; i <= Math.min(totalPages, 7); i++) {
+      pagHtml += `<button class="page-btn ${i===admPage?'active':''}" onclick="admPage=${i};loadAdmissoesTable()">${i}</button>`
+    }
+    document.getElementById('adm-pagination').innerHTML = pagHtml
+  } catch(e) {
+    wrap.innerHTML = `<div class="empty-state"><h3>Erro ao carregar</h3><p>${e.message}</p></div>`
+  }
+}
+
+function copiarLink(token) {
+  const url = `${window.location.origin}${window.location.pathname}#/admissao/${token}`
+  navigator.clipboard.writeText(url).then(() => toast('Link copiado!', 'success'))
+}
+
+// ── NOVO CONVITE ──
+function renderNovoConvite() {
+  const main = document.getElementById('page-main')
+  const BANCOS = [
+    ['001','Banco do Brasil'],['033','Santander'],['041','Banrisul'],['104','Caixa Econômica Federal'],
+    ['237','Bradesco'],['341','Itaú Unibanco'],['077','Banco Inter'],['260','Nubank'],
+    ['290','PagBank'],['336','C6 Bank'],['212','Banco Original'],['748','Sicredi'],['756','Sicoob'],
+  ]
+  main.innerHTML = `
+  <div class="slide-up" style="max-width:680px;">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h3>Pré-Cadastro do Candidato</h3>
+          <p style="font-size:12px;color:var(--gray500);margin-top:2px;">Preencha os dados para gerar o link de admissão</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="form-convite-success" class="hidden" style="background:#D1FAE5;border:1px solid #A7F3D0;border-radius:var(--radius);padding:16px;margin-bottom:20px;">
+          <div style="font-weight:700;color:#065F46;font-size:14px;margin-bottom:6px;">✓ Convite criado com sucesso!</div>
+          <div style="font-size:13px;color:#065F46;margin-bottom:10px;">Copie o link abaixo e envie ao candidato:</div>
+          <div style="background:white;border:1px solid #A7F3D0;border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:8px;">
+            <input id="link-gerado" readonly style="flex:1;border:none;outline:none;font-size:12px;font-family:var(--mono);color:var(--navy);background:transparent;">
+            <button class="btn btn-primary btn-sm" onclick="document.getElementById('link-gerado').select();document.execCommand('copy');toast('Link copiado!','success')">Copiar</button>
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('form-convite-success').classList.add('hidden');document.getElementById('form-convite').reset()">Novo Convite</button>
+            <button class="btn btn-ghost btn-sm" onclick="navigateTo('admissoes')">Ver Admissões</button>
+          </div>
+        </div>
+
+        <form id="form-convite" onsubmit="submitNovoConvite(event)">
+          <div class="section-title">Dados do Candidato</div>
+          <div class="input-group">
+            <div class="field">
+              <label>Nome Completo *</label>
+              <input type="text" name="candidato_nome" required placeholder="João da Silva">
+            </div>
+            <div class="field">
+              <label>E-mail *</label>
+              <input type="email" name="candidato_email" required placeholder="joao@email.com">
+            </div>
+          </div>
+          <div class="field">
+            <label>Telefone / WhatsApp</label>
+            <input type="text" name="candidato_telefone" placeholder="(11) 99999-9999" id="input-tel-convite">
+          </div>
+
+          <div class="divider"></div>
+          <div class="section-title">Dados da Vaga</div>
+
+          <div class="input-group">
+            <div class="field">
+              <label>Função / Cargo *</label>
+              <input type="text" name="funcao" required placeholder="Auxiliar de Produção">
+            </div>
+            <div class="field">
+              <label>Salário</label>
+              <input type="text" name="salario" placeholder="R$ 2.000,00" id="input-salario-convite">
+            </div>
+          </div>
+          <div class="input-group">
+            <div class="field">
+              <label>Obra / Unidade</label>
+              <input type="text" name="obra_unidade" placeholder="Unidade São Paulo">
+            </div>
+            <div class="field">
+              <label>Gestor Responsável</label>
+              <input type="text" name="gestor_responsavel" placeholder="Carlos Silva">
+            </div>
+          </div>
+          <div class="input-group">
+            <div class="field">
+              <label>Data Prevista de Admissão</label>
+              <input type="date" name="data_admissao_prevista">
+            </div>
+            <div class="field">
+              <label>Validade do Link (dias)</label>
+              <select name="validade_dias">
+                <option value="7">7 dias</option>
+                <option value="15">15 dias</option>
+                <option value="30" selected>30 dias</option>
+                <option value="60">60 dias</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;margin-top:8px;">
+            <button type="submit" class="btn btn-primary btn-lg" id="btn-criar-convite" style="flex:1;justify-content:center;">
+              🔗 Gerar Link de Admissão
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>`
+
+  applyMask(document.getElementById('input-tel-convite'), 'telefone')
+  const salInput = document.getElementById('input-salario-convite')
+  salInput.addEventListener('input', e => {
+    const n = e.target.value.replace(/\D/g,'')
+    const f = (parseInt(n||0)/100).toFixed(2)
+    e.target.value = 'R$ ' + f.replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.')
+  })
+}
+
+async function submitNovoConvite(e) {
+  e.preventDefault()
+  const btn = document.getElementById('btn-criar-convite')
+  btn.disabled = true; btn.textContent = 'Criando...'
+  const form = e.target
+  const fd = new FormData(form)
+  const salVal = fd.get('salario').replace(/[^\d,]/g,'').replace(',','.')
+  try {
+    const validadeDias = parseInt(fd.get('validade_dias') || 30)
+    const expiresAt = new Date(Date.now() + validadeDias * 86400000).toISOString()
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2,'0')).join('')
+    const payload = {
+      token,
+      candidato_nome: sanitizar(fd.get('candidato_nome') || ''),
+      candidato_email: (fd.get('candidato_email') || '').trim().toLowerCase(),
+      candidato_telefone: fd.get('candidato_telefone') || null,
+      funcao: fd.get('funcao'),
+      salario: parseFloat(salVal) || null,
+      obra_unidade: fd.get('obra_unidade') || null,
+      gestor_responsavel: fd.get('gestor_responsavel') || null,
+      data_admissao_prevista: fd.get('data_admissao_prevista') || null,
+      validade_ate: expiresAt,
+      criado_por: APP.user.id,
+      status: 'pendente',
+    }
+    const { error } = await sb.from('convites').insert(payload)
+    if (error) throw error
+    const link = `${window.location.origin}${window.location.pathname}#/admissao/${token}`
+    document.getElementById('link-gerado').value = link
+    document.getElementById('form-convite-success').classList.remove('hidden')
+    form.reset()
+    toast('Convite criado com sucesso!', 'success')
+    loadDashboardBadge()
+  } catch(err) {
+    toast('Erro ao criar convite: ' + err.message, 'error')
+  } finally {
+    btn.disabled = false; btn.textContent = '🔗 Gerar Link de Admissão'
+  }
+}
+
+// ── DETALHE ADMISSÃO ──
+async function abrirDetalheAdmissao(id) {
+  openModal('modal-detalhe')
+  const body = document.getElementById('modal-detalhe-body')
+  body.innerHTML = '<div style="padding:40px;text-align:center;"><div class="load-ring" style="margin:0 auto;border-top-color:var(--navy);"></div></div>'
+  try {
+    const { data: convite } = await sb.from('convites').select('*').eq('id',id).single()
+    const { data: colab } = await sb.from('colaboradores').select('*, dependentes(*), documentos(*)').eq('convite_id',id).maybeSingle()
+    const { data: timeline } = await sb.from('timeline').select('*').eq('convite_id',id).order('created_at',{ascending:false}).limit(10)
+    const { data: obs } = await sb.from('observacoes').select('*').eq('convite_id',id).order('created_at',{ascending:false})
+
+    body.innerHTML = `
+    <div class="tabs" id="detail-tabs">
+      <button class="tab-btn active" data-tab="geral">Geral</button>
+      <button class="tab-btn" data-tab="dados">Dados</button>
+      <button class="tab-btn" data-tab="documentos">Documentos (${colab?.documentos?.length||0})</button>
+      <button class="tab-btn" data-tab="timeline">Timeline</button>
+      <button class="tab-btn" data-tab="obs">Observações (${obs?.length||0})</button>
+    </div>
+    <div id="tab-content-geral" class="tab-content">
+      <div class="input-group">
+        <div>
+          <div class="section-title">Candidato</div>
+          <p style="font-size:17px;font-weight:700;color:var(--navy);margin-bottom:4px;">${convite.candidato_nome}</p>
+          <p style="font-size:13px;color:var(--gray500);">${convite.candidato_email}</p>
+          <p style="font-size:13px;color:var(--gray500);">${convite.candidato_telefone||''}</p>
+        </div>
+        <div>
+          <div class="section-title">Vaga</div>
+          <div style="display:flex;flex-direction:column;gap:4px;">
+            <div style="font-size:13px;"><b>Função:</b> ${convite.funcao}</div>
+            <div style="font-size:13px;"><b>Salário:</b> ${formatMoney(convite.salario)}</div>
+            <div style="font-size:13px;"><b>Unidade:</b> ${convite.obra_unidade||'—'}</div>
+            <div style="font-size:13px;"><b>Gestor:</b> ${convite.gestor_responsavel||'—'}</div>
+            <div style="font-size:13px;"><b>Admissão:</b> ${formatDate(convite.data_admissao_prevista)}</div>
+          </div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="input-group">
+        <div>
+          <div class="section-title">Status Atual</div>
+          <div style="margin-bottom:12px;">${statusBadge(convite.status)}</div>
+          <select id="select-novo-status" class="filter-select" style="width:100%;">
+            <option value="">Alterar status...</option>
+            ${['pendente','em_andamento','documentacao_incompleta','em_analise','completa','aprovada','reprovada','admitido','expirado'].map(s=>`<option value="${s}">${s.replace(/_/g,' ')}</option>`).join('')}
+          </select>
+          <button class="btn btn-primary btn-sm" style="margin-top:8px;width:100%;justify-content:center;" onclick="alterarStatus('${convite.id}')">Atualizar Status</button>
+        </div>
+        <div>
+          <div class="section-title">Link de Acesso</div>
+          <div style="background:var(--gray50);border:1px solid var(--gray200);border-radius:6px;padding:8px 10px;margin-bottom:8px;">
+            <div style="font-size:11px;color:var(--gray500);margin-bottom:3px;">Válido até: ${formatDate(convite.validade_ate)}</div>
+            <div style="font-size:10px;font-family:var(--mono);color:var(--navy);word-break:break-all;">${window.location.origin}${window.location.pathname}#/admissao/${convite.token}</div>
+          </div>
+          <button class="btn btn-outline btn-sm w-full" style="justify-content:center;" onclick="copiarLink('${convite.token}')">🔗 Copiar Link</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline btn-sm" onclick="APP._obsConviteId='${convite.id}';openModal('modal-obs')">💬 Adicionar Observação</button>
+        ${APP.profile?.role==='admin_rh'?`<button class="btn btn-danger btn-sm" onclick="if(confirm('Excluir este convite?'))excluirConvite('${convite.id}')">🗑 Excluir</button>`:''}
+      </div>
+    </div>
+    <div id="tab-content-dados" class="tab-content hidden">
+      ${colab ? renderDadosColab(colab) : '<div class="empty-state"><div class="e-icon">📋</div><h3>Candidato ainda não preencheu os dados</h3></div>'}
+    </div>
+    <div id="tab-content-documentos" class="tab-content hidden">
+      ${renderDocumentosColab(colab?.documentos||[])}
+    </div>
+    <div id="tab-content-timeline" class="tab-content hidden">
+      <div class="timeline">
+        ${(timeline||[]).map(t=>`
+          <div class="timeline-item">
+            <div class="tl-line"></div>
+            <div class="tl-dot" style="background:var(--navy);color:var(--gold);font-size:10px;">⚡</div>
+            <div class="tl-body">
+              <div class="tl-event">${t.evento.replace(/_/g,' ')}</div>
+              <div class="tl-desc">${t.descricao||''}</div>
+              <div class="tl-time">${new Date(t.created_at).toLocaleString('pt-BR')}</div>
+            </div>
+          </div>
+        `).join('') || '<div class="empty-state"><div class="e-icon">📜</div><h3>Nenhum evento registrado</h3></div>'}
+      </div>
+    </div>
+    <div id="tab-content-obs" class="tab-content hidden">
+      <button class="btn btn-outline btn-sm" style="margin-bottom:12px;" onclick="APP._obsConviteId='${convite.id}';openModal('modal-obs')">➕ Nova Observação</button>
+      ${(obs||[]).map(o=>`
+        <div class="obs-item">
+          <div class="obs-autor">${o.autor_nome} ${o.visivel_candidato?'<span class="chip" style="font-size:9px;">Visível ao candidato</span>':''}</div>
+          <div class="obs-texto">${o.texto}</div>
+          <div class="obs-data">${new Date(o.created_at).toLocaleString('pt-BR')}</div>
+        </div>
+      `).join('') || '<div class="empty-state"><div class="e-icon">💬</div><h3>Sem observações</h3></div>'}
+    </div>`
+
+    // Tabs
+    document.querySelectorAll('#detail-tabs .tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#detail-tabs .tab-btn').forEach(b => b.classList.remove('active'))
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'))
+        btn.classList.add('active')
+        document.getElementById(`tab-content-${btn.dataset.tab}`).classList.remove('hidden')
+      })
+    })
+  } catch(e) {
+    body.innerHTML = `<div class="empty-state"><h3>Erro ao carregar</h3><p>${e.message}</p></div>`
+  }
+}
+
+function renderDadosColab(c) {
+  const S = sanitizar
+  const addrParts = [c.logradouro, c.numero, c.complemento, c.bairro].filter(Boolean)
+  const cityPart = [c.cidade, c.estado].filter(Boolean).join('/')
+  return `
+  <div>
+    <div class="section-title">Dados Pessoais</div>
+    <div class="dados-grid" style="margin-bottom:16px;">
+      <div class="dado-item"><div class="dado-label">Nome</div><div class="dado-val">${S(c.nome_completo)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">CPF</div><div class="dado-val">${formatCPF(c.cpf)}</div></div>
+      <div class="dado-item"><div class="dado-label">RG</div><div class="dado-val">${S(c.rg)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Nascimento</div><div class="dado-val">${formatDate(c.data_nascimento)}</div></div>
+      <div class="dado-item"><div class="dado-label">Estado Civil</div><div class="dado-val">${S(c.estado_civil)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Sexo</div><div class="dado-val">${S(c.sexo)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Nome da Mãe</div><div class="dado-val">${S(c.nome_mae)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Telefone</div><div class="dado-val">${formatPhone(c.telefone)}</div></div>
+    </div>
+    <div class="section-title">Endereço</div>
+    <div class="dado-item" style="margin-bottom:16px;">
+      <div class="dado-val" style="font-size:13px;font-weight:500;">
+        ${S(addrParts.join(', '))}${cityPart ? ' — '+S(cityPart) : ''}${c.cep ? ' | CEP '+c.cep : ''}
+      </div>
+    </div>
+    <div class="section-title">Dados Bancários</div>
+    <div class="dados-grid" style="margin-bottom:16px;">
+      <div class="dado-item"><div class="dado-label">Banco</div><div class="dado-val">${S(c.banco_nome)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Agência</div><div class="dado-val">${S(c.agencia)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Conta</div><div class="dado-val">${S(c.conta)||'—'}</div></div>
+      <div class="dado-item"><div class="dado-label">Tipo</div><div class="dado-val">${S(c.conta_tipo)||'—'}</div></div>
+    </div>
+    ${(c.dependentes||[]).length ? \`
+    <div class="section-title">Dependentes (${(c.dependentes||[]).length})</div>
+    ${(c.dependentes||[]).map(d=>\`
+      <div class="dado-item" style="margin-bottom:6px;">
+        <div class="dado-val">\${S(d.nome)} — <span style="font-weight:400;color:var(--gray500);">\${S(d.parentesco)} | \${formatDate(d.data_nascimento)}</span></div>
+      </div>
+    \`).join('')}\` : ''}
+  </div>\`
+}
+
+
+function renderDocumentosColab(docs) {
+  const tipos = [
+    { key:'rg', label:'RG' }, { key:'cpf', label:'CPF' }, { key:'ctps', label:'CTPS' },
+    { key:'titulo_eleitor', label:'Título Eleitor' }, { key:'reservista', label:'Reservista' },
+    { key:'comp_residencia', label:'Comp. Residência' }, { key:'cartao_banco', label:'Cartão Banco' },
+    { key:'foto_3x4', label:'Foto 3x4' },
+  ]
+  const docMap = {}
+  docs.forEach(d => { docMap[d.tipo] = d })
+  return `
+  <div class="doc-checklist">
+    ${tipos.map(t => {
+      const doc = docMap[t.key]
+      const cls = doc ? (doc.status === 'aprovado' ? 'done' : doc.status === 'reprovado' ? 'error' : '') : 'error'
+      const icon = doc ? (doc.status === 'aprovado' ? '✓' : doc.status === 'reprovado' ? '✗' : '⏳') : '✗'
+      return `<div class="doc-item ${cls}">
+        <span class="doc-check">${icon}</span>
+        <div>
+          <div style="font-weight:600;">${t.label}</div>
+          ${doc ? `<div style="font-size:10px;margin-top:1px;">${doc.status} ${doc.motivo_reprovacao?'— '+doc.motivo_reprovacao:''}</div>` : '<div style="font-size:10px;">Não enviado</div>'}
+        </div>
+        ${doc && doc.status === 'pendente' ? `
+          <div style="margin-left:auto;display:flex;gap:4px;">
+            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#D1FAE5;color:#065F46;border:none;" onclick="aprovarDoc('${doc.id}')">✓</button>
+            <button class="btn btn-sm" style="padding:3px 8px;font-size:10px;background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${doc.id}')">✗</button>
+          </div>` : ''}
+      </div>`
+    }).join('')}
+  </div>`
+}
+
+async function alterarStatus(conviteId) {
+  const novoStatus = document.getElementById('select-novo-status').value
+  if (!novoStatus) { toast('Selecione um status.', 'warning'); return }
+  const { error } = await sb.from('convites').update({ status: novoStatus }).eq('id', conviteId)
+  if (error) { toast('Erro ao atualizar.', 'error'); return }
+  toast('Status atualizado!', 'success')
+  abrirDetalheAdmissao(conviteId)
+}
+
+async function excluirConvite(id) {
+  await sb.from('convites').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  closeModal('modal-detalhe')
+  renderAdmissoes()
+  toast('Convite excluído.', 'info')
+}
+
+async function aprovarDoc(docId) {
+  await sb.from('documentos').update({ status:'aprovado', revisado_em: new Date().toISOString() }).eq('id', docId)
+  toast('Documento aprovado!', 'success')
+}
+
+let _reprovarDocId = null
+function reprovarDocOpen(docId) { _reprovarDocId = docId; openModal('modal-reprovar-doc') }
+
+async function previewDoc(storagePath) {
+  try {
+    const { data, error } = await sb.storage.from('admissoes').createSignedUrl(storagePath, 300) // 5 min
+    if (error) throw error
+    window.open(data.signedUrl, '_blank', 'noopener')
+  } catch(e) {
+    toast('Não foi possível abrir o documento.', 'error')
+  }
+}
+
+document.getElementById('btn-confirmar-reprovar').addEventListener('click', async () => {
+  const motivo = document.getElementById('reprovar-motivo').value.trim()
+  if (!motivo) { toast('Informe o motivo.', 'warning'); return }
+  await sb.from('documentos').update({ status:'reprovado', motivo_reprovacao: motivo }).eq('id', _reprovarDocId)
+  closeModal('modal-reprovar-doc')
+  toast('Documento reprovado.', 'info')
+})
+
+// ── Observações ──
+document.getElementById('btn-salvar-obs').addEventListener('click', async () => {
+  const texto = document.getElementById('obs-texto').value.trim()
+  if (!texto) { toast('Escreva uma observação.', 'warning'); return }
+  const visivel = document.getElementById('obs-visivel').checked
+  await sb.from('observacoes').insert({
+    convite_id: APP._obsConviteId,
+    texto,
+    autor_nome: APP.profile?.nome || 'RH',
+    visivel_candidato: visivel,
+  })
+  closeModal('modal-obs')
+  toast('Observação salva!', 'success')
+})
+
+// ── EXPORTAÇÃO ──
+async function renderExportacao() {
+  const main = document.getElementById('page-main')
+  main.innerHTML = `
+  <div class="slide-up" style="max-width:720px;">
+    <div class="card">
+      <div class="card-header">
+        <h3>Exportação Star Soft</h3>
+      </div>
+      <div class="card-body">
+        <p style="font-size:14px;color:var(--gray600);margin-bottom:20px;">Exporte os dados admissionais em formato compatível com o sistema Star Soft.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+          <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon" style="background:var(--sky);">📊</div>
+            <div style="font-size:13px;font-weight:600;color:var(--navy);">Colaboradores</div>
+            <div style="font-size:12px;color:var(--gray500);">Dados pessoais, trabalhistas, bancários</div>
+          </div>
+          <div class="stat-card" style="cursor:default;">
+            <div class="stat-icon" style="background:#D1FAE5;">👶</div>
+            <div style="font-size:13px;font-weight:600;color:var(--navy);">Dependentes</div>
+            <div style="font-size:12px;color:var(--gray500);">Todos os dependentes cadastrados</div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Filtrar por Status</label>
+          <select id="export-status">
+            <option value="">Todos</option>
+            <option value="aprovada">Aprovados</option>
+            <option value="admitido">Admitidos</option>
+            <option value="completa">Completos</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Período</label>
+          <div class="input-group">
+            <input type="date" id="export-de" placeholder="De">
+            <input type="date" id="export-ate" placeholder="Até">
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary btn-lg" id="btn-export-xlsx" onclick="executarExport('xlsx')">
+            📊 Exportar XLSX
+          </button>
+          <button class="btn btn-outline btn-lg" id="btn-export-csv" onclick="executarExport('csv')">
+            📄 Exportar CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>`
+}
+
+async function executarExport(tipo) {
+  const btn = document.getElementById(`btn-export-${tipo}`)
+  btn.disabled = true; btn.textContent = 'Exportando...'
+  try {
+    let query = sb.from('colaboradores').select('*, convites(*), dependentes(*), documentos(tipo,status)').is('deleted_at',null)
+    const status = document.getElementById('export-status')?.value
+    if (status) query = query.eq('convites.status', status)
+    const { data, error } = await query
+    if (error) throw error
+
+    if (tipo === 'xlsx') {
+      gerarXLSX(data)
+    } else {
+      gerarCSV(data)
+    }
+    toast(`Exportação ${tipo.toUpperCase()} concluída!`, 'success')
+  } catch(e) {
+    toast('Erro na exportação: ' + e.message, 'error')
+  } finally {
+    btn.disabled = false
+    btn.textContent = tipo === 'xlsx' ? '📊 Exportar XLSX' : '📄 Exportar CSV'
+  }
+}
+
+function gerarXLSX(data) {
+  if (typeof XLSX === 'undefined') { toast('SheetJS não disponível.', 'error'); return }
+  const wb = XLSX.utils.book_new()
+  const headers = ['NOME','CPF','RG','SEXO','ESTADO_CIVIL','NASCIMENTO','MAE','PAI','TELEFONE','WHATSAPP','EMAIL','CEP','LOGRADOURO','NUMERO','COMPLEMENTO','BAIRRO','CIDADE','UF','PIS','CTPS','SERIE_CTPS','FUNCAO','SALARIO','OBRA','ADMISSAO','BANCO_COD','BANCO_NOME','AGENCIA','CONTA','TIPO_CONTA','NACIONALIDADE']
+  const rows = data.map(c => [
+    c.nome_completo, c.cpf, c.rg, c.sexo, c.estado_civil, c.data_nascimento,
+    c.nome_mae, c.nome_pai, c.telefone, c.whatsapp, c.email, c.cep, c.logradouro, c.numero, c.complemento, c.bairro, c.cidade, c.estado,
+    c.pis, c.ctps_numero, c.ctps_serie, c.convites?.funcao, c.convites?.salario, c.convites?.obra_unidade,
+    c.convites?.data_admissao_prevista, c.banco_codigo, c.banco_nome, c.agencia, c.conta, c.conta_tipo, c.nacionalidade,
+  ])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  ws['!cols'] = headers.map(() => ({ wch: 18 }))
+  XLSX.utils.book_append_sheet(wb, ws, 'COLABORADORES')
+
+  // Dependentes
+  const depHeaders = ['COLABORADOR','CPF_COL','NOME_DEP','CPF_DEP','RG_DEP','NASC_DEP','PARENTESCO']
+  const depRows = data.flatMap(c => (c.dependentes||[]).map(d => [
+    c.nome_completo, c.cpf, d.nome, d.cpf, d.rg, d.data_nascimento, d.parentesco
+  ]))
+  if (depRows.length > 0) {
+    const wsDep = XLSX.utils.aoa_to_sheet([depHeaders, ...depRows])
+    XLSX.utils.book_append_sheet(wb, wsDep, 'DEPENDENTES')
+  }
+
+  XLSX.writeFile(wb, `RCONTRACT_${new Date().toISOString().slice(0,10)}.xlsx`)
+}
+
+function gerarCSV(data) {
+  const headers = ['NOME','CPF','RG','TELEFONE','EMAIL','CEP','CIDADE','UF','FUNCAO','SALARIO','ADMISSAO']
+  const rows = [headers, ...data.map(c => [
+    c.nome_completo, c.cpf, c.rg, c.telefone, c.email, c.cep, c.cidade, c.estado,
+    c.convites?.funcao, c.convites?.salario, c.convites?.data_admissao_prevista,
+  ])]
+  const csv = rows.map(r => r.map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(';')).join('\n')
+  const blob = new Blob(['\ufeff'+csv], { type:'text/csv;charset=utf-8;' })
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
+  a.download = `RCONTRACT_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+}
+
+// ── DOCUMENTOS ──
+async function renderDocumentos() {
+  const main = document.getElementById('page-main')
+  try {
+    const { data } = await sb.from('documentos').select('*, colaboradores(nome_completo,cpf)').eq('status','pendente').is('deleted_at',null).order('created_at',{ascending:false}).limit(50)
+    main.innerHTML = `
+    <div class="slide-up">
+      <div class="card">
+        <div class="card-header"><h3>Documentos Pendentes de Revisão (${data?.length||0})</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Colaborador</th><th>Documento</th><th>Categoria</th><th>Tamanho</th><th>Enviado em</th><th>Ações</th></tr></thead>
+            <tbody>
+              ${(data||[]).map(d => `<tr>
+                <td>
+                  <div style="font-weight:600;font-size:13px;">${d.colaboradores?.nome_completo||'—'}</div>
+                  <div style="font-size:11px;color:var(--gray400);">${formatCPF(d.colaboradores?.cpf)}</div>
+                </td>
+                <td><span class="chip">${d.tipo.replace(/_/g,' ').toUpperCase()}</span></td>
+                <td style="font-size:12px;text-transform:capitalize;">${d.categoria}</td>
+                <td style="font-size:12px;font-family:var(--mono);">${d.tamanho_bytes ? (d.tamanho_bytes/1024).toFixed(0)+'KB' : '—'}</td>
+                <td style="font-size:12px;font-family:var(--mono);">${formatDate(d.created_at)}</td>
+                <td>
+                  <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                    ${d.storage_path ? `<button class="btn btn-sm" style="background:var(--sky);color:#1E40AF;border:none;" onclick="previewDoc('${d.storage_path}')">👁 Ver</button>` : ''}
+                    <button class="btn btn-sm" style="background:#D1FAE5;color:#065F46;border:none;" onclick="aprovarDoc('${d.id}')">✓ Aprovar</button>
+                    <button class="btn btn-sm" style="background:#FEE2E2;color:#991B1B;border:none;" onclick="reprovarDocOpen('${d.id}')">✗ Reprovar</button>
+                  </div>
+                </td>
+              </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state" style="padding:24px"><div class="e-icon">✅</div><h3>Nenhum documento pendente</h3></div></td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>`
+  } catch(e) {
+    main.innerHTML = `<div class="empty-state"><h3>Erro</h3><p>${e.message}</p></div>`
+  }
+}
+
+// ── CONFIGURAÇÕES ──
+function renderConfiguracoes() {
+  const main = document.getElementById('page-main')
+  main.innerHTML = `
+  <div class="slide-up" style="max-width:680px;">
+    <div class="card">
+      <div class="card-header"><h3>Configurações do Sistema</h3></div>
+      <div class="card-body">
+        <div class="divider"></div>
+        <div class="section-title">Perfil do Usuário</div>
+        <div class="field">
+          <label>Nome</label>
+          <input type="text" id="cfg-nome" value="${APP.profile?.nome||''}">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:8px;">
+          <button class="btn btn-primary" onclick="salvarConfiguracoes()">Salvar Alterações</button>
+        </div>
+        <div class="divider"></div>
+        <div class="section-title">Versão</div>
+        <p style="font-size:12px;color:var(--gray500);">RCONTRACT v1.0.0 — Sistema privado de gestão de admissões<br>Desenvolvido para uso interno do RH.</p>
+      </div>
+    </div>
+  </div>`
+}
+
+async function salvarConfiguracoes() {
+  const nome = document.getElementById('cfg-nome').value.trim()
+  if (nome && APP.user) {
+    await sb.from('perfis').update({ nome }).eq('id', APP.user.id)
+    if (APP.profile) APP.profile.nome = nome
+    document.getElementById('sidebar-user-name').textContent = nome
+    toast('Configurações salvas!', 'success')
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// CANDIDATO — FORMULÁRIO
+// ════════════════════════════════════════════════════════════════
+
+const ETAPAS = [
+  { num: 0, label: 'LGPD' },
+  { num: 1, label: 'Dados Pessoais' },
+  { num: 2, label: 'Contato' },
+  { num: 3, label: 'Endereço' },
+  { num: 4, label: 'Trabalhista' },
+  { num: 5, label: 'Bancário' },
+  { num: 6, label: 'Dependentes' },
+  { num: 7, label: 'Foto' },
+  { num: 8, label: 'Documentos' },
+]
+
+async function initCandidato(token) {
+  showPage('page-candidato')
+  hideLoading()
+
+  try {
+    const { data: convite, error } = await sb.from('convites').select('*, colaboradores(*), aceite_lgpd(*)').eq('token', token).is('deleted_at', null).single()
+    if (error || !convite) { renderCandError('Convite não encontrado ou inválido.'); return }
+    if (new Date(convite.validade_ate) < new Date()) { renderCandError('Este link de admissão expirou. Entre em contato com o RH.'); return }
+
+    APP.conviteAtual = convite
+    APP.colaboradorId = convite.colaboradores?.id || null
+    APP.dadosCandidato = convite.colaboradores || {}
+    APP.etapaAtual = convite.colaboradores?.etapa_atual || 0
+
+    document.getElementById('cand-nome-header').textContent = convite.candidato_nome
+    document.getElementById('cand-funcao-header').textContent = convite.funcao
+
+    // Verificar LGPD
+    if (!convite.aceite_lgpd?.length) {
+      APP.etapaAtual = 0
+    }
+
+    renderStepper()
+    renderEtapa(APP.etapaAtual)
+
+    // Atualizar data de acesso
+    await sb.from('convites').update({ acessado_em: new Date().toISOString() }).eq('id', convite.id)
+  } catch(e) {
+    renderCandError(e.message)
+  }
+}
+
+function renderCandError(msg) {
+  document.getElementById('stepper-container').classList.add('hidden')
+  document.getElementById('progress-fill').parentElement.parentElement.classList.add('hidden')
+  document.getElementById('cand-content').innerHTML = `
+  <div style="max-width:480px;margin:60px auto;padding:20px;text-align:center;">
+    <div style="font-size:56px;margin-bottom:16px;">⚠️</div>
+    <h2 style="font-size:20px;font-weight:700;color:var(--navy);margin-bottom:8px;">Acesso Indisponível</h2>
+    <p style="color:var(--gray500);font-size:14px;">${msg}</p>
+    <p style="font-size:12px;color:var(--gray400);margin-top:12px;">Se o problema persistir, entre em contato com o RH.</p>
+  </div>`
+}
+
+function renderStepper() {
+  const stepper = document.getElementById('stepper')
+  stepper.innerHTML = ETAPAS.map((e, i) => {
+    const state = e.num < APP.etapaAtual ? 'done' : e.num === APP.etapaAtual ? 'active' : 'pending'
+    const connector = i < ETAPAS.length - 1 ? `<div class="step-connector ${e.num < APP.etapaAtual ? 'done' : 'pending'}"></div>` : ''
+    return `
+    <div class="step-item" onclick="if(${e.num} <= ${APP.etapaAtual}) renderEtapa(${e.num})">
+      <div class="step-circle ${state}">${state === 'done' ? '✓' : e.num}</div>
+      <div class="step-label ${state}">${e.label}</div>
+    </div>${connector}`
+  }).join('')
+
+  const pct = (APP.etapaAtual / (ETAPAS.length - 1)) * 100
+  document.getElementById('progress-fill').style.width = pct + '%'
+}
+
+async function renderEtapa(num) {
+  APP.etapaAtual = num
+  renderStepper()
+  const content = document.getElementById('cand-content')
+  content.innerHTML = ''
+  content.className = 'fade-in'
+
+  const renders = {
+    0: renderLGPD,
+    1: renderEtapa1,
+    2: renderEtapa2,
+    3: renderEtapa3,
+    4: renderEtapa4,
+    5: renderEtapa5,
+    6: renderEtapa6,
+    7: renderEtapa7,
+    8: renderEtapa8,
+  }
+  if (renders[num]) await renders[num](content)
+}
+
+// ── LGPD ──
+function renderLGPD(container) {
+  container.innerHTML = `
+  <div class="lgpd-wrap">
+    <div class="lgpd-card">
+      <div class="lgpd-header">
+        <h2>🔒 Termo de Consentimento LGPD</h2>
+        <p>Lei Geral de Proteção de Dados — Lei nº 13.709/2018</p>
+      </div>
+      <div class="lgpd-body">
+        <p><strong>Prezado(a) candidato(a),</strong></p>
+        <p>Para prosseguir com o processo de admissão, solicitamos sua autorização para o tratamento dos seus dados pessoais, conforme a Lei Geral de Proteção de Dados (LGPD).</p>
+        <p><strong>Dados coletados:</strong> Nome completo, CPF, RG, data de nascimento, dados de contato, endereço, documentos pessoais, dados bancários e foto.</p>
+        <p><strong>Finalidade:</strong> Os dados coletados serão utilizados exclusivamente para fins de contratação, integração no sistema de RH, processamento de folha de pagamento e demais obrigações legais e trabalhistas.</p>
+        <p><strong>Armazenamento:</strong> Seus dados serão armazenados de forma segura e criptografada, acessíveis apenas pela equipe de RH autorizada.</p>
+        <p><strong>Direitos:</strong> Você tem o direito de acessar, corrigir, portabilizar ou solicitar a exclusão dos seus dados a qualquer momento, desde que não haja impedimento legal.</p>
+        <p><strong>Responsável pelo tratamento:</strong> Departamento de Recursos Humanos da empresa.</p>
+        <p>Ao prosseguir, você declara ter lido e concordado com este termo de consentimento para o tratamento dos seus dados pessoais para fins de admissão.</p>
+      </div>
+      <div class="lgpd-footer">
+        <div class="section-title">Assinatura Digital</div>
+        <p style="font-size:12px;color:var(--gray500);margin-bottom:8px;">Assine no campo abaixo usando o dedo ou mouse:</p>
+        <div class="sig-canvas-wrap">
+          <canvas id="sig-canvas"></canvas>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <button class="btn btn-ghost btn-sm" id="btn-limpar-sig">↩ Limpar</button>
+        </div>
+        <label class="checkbox-field" style="margin-bottom:16px;">
+          <input type="checkbox" id="lgpd-aceite">
+          <span>Li e <strong>aceito</strong> o tratamento dos meus dados pessoais para fins de contratação e admissão conforme a Lei Geral de Proteção de Dados (LGPD).</span>
+        </label>
+        <button class="btn btn-primary btn-lg w-full" id="btn-aceitar-lgpd" style="justify-content:center;">
+          Aceitar e Iniciar Preenchimento →
+        </button>
+      </div>
+    </div>
+  </div>`
+
+  // Inicializar canvas assinatura
+  const canvas = document.getElementById('sig-canvas')
+  const ctx = canvas.getContext('2d')
+  // Tamanho correto do canvas
+  function resizeCanvas() { canvas.width = canvas.offsetWidth || 320; canvas.height = 120; }
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas)
+  canvas.height = 120
+  let drawing = false, lastX = 0, lastY = 0
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect()
+    const src = e.touches ? e.touches[0] : e
+    return [src.clientX - rect.left, src.clientY - rect.top]
+  }
+  canvas.addEventListener('mousedown', e => { drawing = true; [lastX, lastY] = getPos(e) })
+  canvas.addEventListener('mousemove', e => {
+    if (!drawing) return
+    const [x, y] = getPos(e)
+    ctx.strokeStyle = '#0E2140'; ctx.lineWidth = 2; ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke()
+    lastX = x; lastY = y
+  })
+  canvas.addEventListener('mouseup', () => drawing = false)
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e) }, { passive: false })
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault()
+    if (!drawing) return
+    const [x, y] = getPos(e)
+    ctx.strokeStyle = '#0E2140'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke()
+    lastX = x; lastY = y
+  }, { passive: false })
+  canvas.addEventListener('touchend', () => drawing = false)
+
+  document.getElementById('btn-limpar-sig').addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  })
+
+  document.getElementById('btn-aceitar-lgpd').addEventListener('click', async () => {
+    if (!document.getElementById('lgpd-aceite').checked) {
+      toast('Você precisa aceitar o termo para continuar.', 'warning'); return
+    }
+    // Verificar se assinou
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const hasSignature = Array.from(imageData.data).some((v, i) => i % 4 === 3 && v > 0)
+    if (!hasSignature) {
+      toast('Por favor, assine no campo antes de continuar.', 'warning'); return
+    }
+
+    const btn = document.getElementById('btn-aceitar-lgpd')
+    btn.disabled = true; btn.textContent = 'Registrando...'
+    try {
+      // Registrar aceite
+      await sb.from('aceite_lgpd').insert({
+        convite_id: APP.conviteAtual.id,
+        aceito: true,
+        user_agent: navigator.userAgent,
+        assinatura_dados: canvas.toDataURL('image/png'),
+        versao_termo: '1.0',
+      })
+
+      // Atualizar status convite
+      await sb.from('convites').update({ status: 'em_andamento' }).eq('id', APP.conviteAtual.id)
+
+      toast('LGPD aceito! Vamos começar.', 'success')
+      renderEtapa(1)
+    } catch(e) {
+      toast('Erro ao registrar aceite: ' + e.message, 'error')
+      btn.disabled = false; btn.textContent = 'Aceitar e Iniciar Preenchimento →'
+    }
+  })
+}
+
+// ── HELPER: Botões navegar ──
+function botoesNavegacao(numAtual, onAvancar) {
+  return `
+  <div style="display:flex;gap:10px;margin-top:24px;justify-content:space-between;flex-wrap:wrap;">
+    ${numAtual > 1 ? `<button class="btn btn-outline" onclick="renderEtapa(${numAtual-1})">← Voltar</button>` : '<div></div>'}
+    <button class="btn btn-primary btn-lg" id="btn-avancar-${numAtual}" onclick="if(!this.disabled){this.disabled=true;this.textContent='Salvando...';${onAvancar}}" style="flex:1;max-width:280px;justify-content:center;">
+      ${numAtual < 8 ? 'Salvar e Continuar →' : 'Enviar Documentação ✓'}
+    </button>
+  </div>`
+}
+
+// ── ETAPA 1: Dados Pessoais ──
+function renderEtapa1(container) {
+  const d = APP.dadosCandidato
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 1 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Dados Pessoais</h2>
+      <p style="font-size:13px;color:var(--gray500);">Preencha seus dados pessoais conforme documentos oficiais.</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="field">
+          <label>Nome Completo *</label>
+          <input type="text" id="e1-nome" value="${d.nome_completo||''}" placeholder="Conforme RG">
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>CPF *</label>
+            <input type="text" id="e1-cpf" value="${d.cpf||''}" placeholder="000.000.000-00" maxlength="14">
+          </div>
+          <div class="field">
+            <label>Data de Nascimento *</label>
+            <input type="date" id="e1-nascimento" value="${d.data_nascimento||''}">
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>RG *</label>
+            <input type="text" id="e1-rg" value="${d.rg||''}" placeholder="0000000">
+          </div>
+          <div class="field">
+            <label>Órgão Emissor</label>
+            <input type="text" id="e1-orgao" value="${d.rg_orgao_emissor||''}" placeholder="SSP/SP">
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Data de Emissão RG</label>
+            <input type="date" id="e1-emissao" value="${d.rg_data_emissao||''}">
+          </div>
+          <div class="field">
+            <label>Sexo *</label>
+            <select id="e1-sexo">
+              <option value="">Selecione</option>
+              <option value="masculino" ${d.sexo==='masculino'?'selected':''}>Masculino</option>
+              <option value="feminino" ${d.sexo==='feminino'?'selected':''}>Feminino</option>
+              <option value="outro" ${d.sexo==='outro'?'selected':''}>Outro</option>
+              <option value="nao_informado" ${d.sexo==='nao_informado'?'selected':''}>Prefiro não informar</option>
+            </select>
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Estado Civil *</label>
+            <select id="e1-civil">
+              <option value="">Selecione</option>
+              <option value="solteiro" ${d.estado_civil==='solteiro'?'selected':''}>Solteiro(a)</option>
+              <option value="casado" ${d.estado_civil==='casado'?'selected':''}>Casado(a)</option>
+              <option value="divorciado" ${d.estado_civil==='divorciado'?'selected':''}>Divorciado(a)</option>
+              <option value="viuvo" ${d.estado_civil==='viuvo'?'selected':''}>Viúvo(a)</option>
+              <option value="uniao_estavel" ${d.estado_civil==='uniao_estavel'?'selected':''}>União Estável</option>
+              <option value="separado" ${d.estado_civil==='separado'?'selected':''}>Separado(a)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Nacionalidade</label>
+            <input type="text" id="e1-nac" value="${d.nacionalidade||'Brasileiro(a)'}">
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Nome da Mãe *</label>
+            <input type="text" id="e1-mae" value="${d.nome_mae||''}" placeholder="Nome completo">
+          </div>
+          <div class="field">
+            <label>Nome do Pai</label>
+            <input type="text" id="e1-pai" value="${d.nome_pai||''}" placeholder="Nome completo ou Não consta">
+          </div>
+        </div>
+        ${botoesNavegacao(1, 'salvarEtapa1()')}
+      </div>
+    </div>
+  </div>`
+
+  applyMask(document.getElementById('e1-cpf'), 'cpf')
+}
+
+async function salvarEtapa1() {
+  const nome = document.getElementById('e1-nome').value.trim()
+  const cpf = document.getElementById('e1-cpf').value.trim()
+  const nascimento = document.getElementById('e1-nascimento').value
+  const rg = document.getElementById('e1-rg').value.trim()
+  const mae = document.getElementById('e1-mae').value.trim()
+
+  if (!nome) { toast('Nome obrigatório.', 'warning'); return }
+  if (!cpf || !validarCPF(cpf)) { toast('CPF inválido.', 'error'); document.getElementById('e1-cpf').classList.add('error-field'); return }
+  if (!nascimento) { toast('Data de nascimento obrigatória.', 'warning'); _rb1(); return }
+  if (!rg) { toast('RG obrigatório.', 'warning'); _rb1(); return }
+  if (!mae) { toast('Nome da mãe obrigatório.', 'warning'); _rb1(); return }
+
+  const dados = {
+    nome_completo: nome, cpf, data_nascimento: nascimento,
+    rg, rg_orgao_emissor: document.getElementById('e1-orgao').value,
+    rg_data_emissao: document.getElementById('e1-emissao').value || null,
+    sexo: document.getElementById('e1-sexo').value,
+    estado_civil: document.getElementById('e1-civil').value,
+    nacionalidade: document.getElementById('e1-nac').value,
+    nome_mae: mae, nome_pai: document.getElementById('e1-pai').value,
+    etapa_atual: 2,
+  }
+
+  await autoSave(dados)
+  renderEtapa(2)
+}
+
+// ── ETAPA 2: Contato ──
+function renderEtapa2(container) {
+  const d = APP.dadosCandidato
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 2 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Dados de Contato</h2>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="field">
+          <label>Telefone *</label>
+          <input type="tel" id="e2-tel" value="${d.telefone||APP.conviteAtual.candidato_telefone||''}" placeholder="(11) 99999-9999">
+        </div>
+        <div class="field">
+          <label>WhatsApp</label>
+          <input type="tel" id="e2-wpp" value="${d.whatsapp||''}" placeholder="(11) 99999-9999">
+        </div>
+        <div class="field">
+          <label>E-mail *</label>
+          <input type="email" id="e2-email" value="${d.email||APP.conviteAtual.candidato_email||''}" placeholder="seu@email.com">
+        </div>
+        ${botoesNavegacao(2, 'salvarEtapa2()')}
+      </div>
+    </div>
+  </div>`
+
+  applyMask(document.getElementById('e2-tel'), 'telefone')
+  applyMask(document.getElementById('e2-wpp'), 'telefone')
+}
+
+async function salvarEtapa2() {
+  const tel = document.getElementById('e2-tel').value.trim()
+  const email = document.getElementById('e2-email').value.trim()
+  if (!tel || !validarTelefone(tel)) { toast('Telefone inválido. Ex: (11) 99999-9999', 'warning'); return }
+  if (!email || !validarEmail(email)) { toast('E-mail inválido.', 'error'); return }
+  await autoSave({ telefone: tel, whatsapp: document.getElementById('e2-wpp').value, email, etapa_atual: 3 })
+  renderEtapa(3)
+}
+
+// ── ETAPA 3: Endereço ──
+function renderEtapa3(container) {
+  const d = APP.dadosCandidato
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 3 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Endereço Residencial</h2>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="input-group">
+          <div class="field" style="flex:1;">
+            <label>CEP *</label>
+            <div style="display:flex;gap:8px;">
+              <input type="text" id="e3-cep" value="${d.cep||''}" placeholder="00000-000" maxlength="9" style="flex:1;">
+              <button class="btn btn-outline" id="btn-cep" onclick="buscarCEP()">🔍</button>
+            </div>
+          </div>
+        </div>
+        <div class="field" id="e3-logradouro-field">
+          <label>Logradouro (Rua/Av.) *</label>
+          <input type="text" id="e3-logradouro" value="${d.logradouro||''}" placeholder="Rua das Flores">
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Número *</label>
+            <input type="text" id="e3-numero" value="${d.numero||''}" placeholder="123">
+          </div>
+          <div class="field">
+            <label>Complemento</label>
+            <input type="text" id="e3-comp" value="${d.complemento||''}" placeholder="Apto 42, Bloco B">
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Bairro *</label>
+            <input type="text" id="e3-bairro" value="${d.bairro||''}" placeholder="Centro">
+          </div>
+          <div class="field">
+            <label>Cidade *</label>
+            <input type="text" id="e3-cidade" value="${d.cidade||''}" placeholder="São Paulo">
+          </div>
+        </div>
+        <div class="field" style="max-width:180px;">
+          <label>Estado *</label>
+          <select id="e3-estado">
+            <option value="">UF</option>
+            ${['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(uf=>`<option value="${uf}" ${d.estado===uf?'selected':''}>${uf}</option>`).join('')}
+          </select>
+        </div>
+        ${botoesNavegacao(3, 'salvarEtapa3()')}
+      </div>
+    </div>
+  </div>`
+
+  applyMask(document.getElementById('e3-cep'), 'cep')
+}
+
+async function buscarCEP() {
+  const cep = document.getElementById('e3-cep').value.replace(/\D/g,'')
+  if (cep.length !== 8) { toast('CEP inválido.', 'warning'); return }
+  const btn = document.getElementById('btn-cep')
+  btn.disabled = true; btn.textContent = '...'
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+    const data = await res.json()
+    if (data.erro) { toast('CEP não encontrado.', 'error'); return }
+    document.getElementById('e3-logradouro').value = data.logradouro || ''
+    document.getElementById('e3-bairro').value = data.bairro || ''
+    document.getElementById('e3-cidade').value = data.localidade || ''
+    document.getElementById('e3-estado').value = data.uf || ''
+    document.getElementById('e3-numero').focus()
+    toast('Endereço preenchido!', 'success')
+  } catch(e) { toast('Erro ao buscar CEP.', 'error') }
+  finally { btn.disabled = false; btn.textContent = '🔍' }
+}
+
+async function salvarEtapa3() {
+  const cep = document.getElementById('e3-cep').value.trim()
+  const log = document.getElementById('e3-logradouro').value.trim()
+  const num = document.getElementById('e3-numero').value.trim()
+  if (!cep || !log || !num) { toast('Preencha os campos obrigatórios.', 'warning'); return }
+  await autoSave({
+    cep, logradouro: log, numero: num,
+    complemento: document.getElementById('e3-comp').value,
+    bairro: document.getElementById('e3-bairro').value,
+    cidade: document.getElementById('e3-cidade').value,
+    estado: document.getElementById('e3-estado').value,
+    etapa_atual: 4,
+  })
+  renderEtapa(4)
+}
+
+// ── ETAPA 4: Trabalhista ──
+function renderEtapa4(container) {
+  const d = APP.dadosCandidato
+  const c = APP.conviteAtual
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 4 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Dados Trabalhistas</h2>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="input-group">
+          <div class="field">
+            <label>PIS / PASEP</label>
+            <input type="text" id="e4-pis" value="${d.pis||''}" placeholder="000.00000.00-0">
+          </div>
+          <div class="field">
+            <label>Nº CTPS</label>
+            <input type="text" id="e4-ctps" value="${d.ctps_numero||''}" placeholder="00000000">
+          </div>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Série CTPS</label>
+            <input type="text" id="e4-serie" value="${d.ctps_serie||''}" placeholder="0000">
+          </div>
+          <div class="field">
+            <label>Nº Reservista</label>
+            <input type="text" id="e4-reservista" value="${d.reservista||''}" placeholder="Apenas homens">
+          </div>
+        </div>
+        <div class="input-group-3">
+          <div class="field">
+            <label>Título Eleitor</label>
+            <input type="text" id="e4-titulo" value="${d.titulo_eleitor||''}" placeholder="0000000000000">
+          </div>
+          <div class="field">
+            <label>Zona</label>
+            <input type="text" id="e4-zona" value="${d.titulo_zona||''}" placeholder="000">
+          </div>
+          <div class="field">
+            <label>Seção</label>
+            <input type="text" id="e4-secao" value="${d.titulo_secao||''}" placeholder="0000">
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div style="background:var(--gold-l);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:var(--gold-d);margin-bottom:4px;">Dados da Vaga</div>
+          <div style="font-size:13px;color:var(--gray700);"><b>Função:</b> ${c.funcao} &nbsp;|&nbsp; <b>Admissão:</b> ${c.data_admissao_prevista ? formatDate(c.data_admissao_prevista) : 'A definir'} &nbsp;|&nbsp; <b>Unidade:</b> ${c.obra_unidade||'—'}</div>
+        </div>
+        ${botoesNavegacao(4, 'salvarEtapa4()')}
+      </div>
+    </div>
+  </div>`
+}
+
+async function salvarEtapa4() {
+  await autoSave({
+    pis: document.getElementById('e4-pis').value,
+    ctps_numero: document.getElementById('e4-ctps').value,
+    ctps_serie: document.getElementById('e4-serie').value,
+    reservista: document.getElementById('e4-reservista').value,
+    titulo_eleitor: document.getElementById('e4-titulo').value,
+    titulo_zona: document.getElementById('e4-zona').value,
+    titulo_secao: document.getElementById('e4-secao').value,
+    etapa_atual: 5,
+  })
+  renderEtapa(5)
+}
+
+// ── ETAPA 5: Bancário ──
+const BANCOS = [
+  ['001','Banco do Brasil'],['033','Santander'],['041','Banrisul'],['104','Caixa Econômica'],
+  ['237','Bradesco'],['341','Itaú Unibanco'],['077','Inter'],['260','Nubank'],
+  ['290','PagBank'],['336','C6 Bank'],['212','Banco Original'],['748','Sicredi'],['756','Sicoob'],
+]
+
+function renderEtapa5(container) {
+  const d = APP.dadosCandidato
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 5 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Dados Bancários</h2>
+      <p style="font-size:13px;color:var(--gray500);">Informe a conta para recebimento do salário.</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div class="field">
+          <label>Banco *</label>
+          <select id="e5-banco" onchange="selecionarBanco()">
+            <option value="">Selecione o banco</option>
+            ${BANCOS.map(([cod,nome]) => `<option value="${cod}|${nome}" ${d.banco_codigo===cod?'selected':''}>${cod} — ${nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="input-group">
+          <div class="field">
+            <label>Agência *</label>
+            <input type="text" id="e5-agencia" value="${d.agencia||''}" placeholder="0000">
+          </div>
+          <div class="field">
+            <label>Conta *</label>
+            <input type="text" id="e5-conta" value="${d.conta||''}" placeholder="00000-0">
+          </div>
+        </div>
+        <div class="field">
+          <label>Tipo de Conta *</label>
+          <select id="e5-tipo">
+            <option value="">Selecione</option>
+            <option value="corrente" ${d.conta_tipo==='corrente'?'selected':''}>Conta Corrente</option>
+            <option value="poupanca" ${d.conta_tipo==='poupanca'?'selected':''}>Conta Poupança</option>
+            <option value="salario" ${d.conta_tipo==='salario'?'selected':''}>Conta Salário</option>
+          </select>
+        </div>
+        ${botoesNavegacao(5, 'salvarEtapa5()')}
+      </div>
+    </div>
+  </div>`
+}
+
+function selecionarBanco() {
+  const val = document.getElementById('e5-banco').value
+  if (val) { const [cod, nome] = val.split('|'); }
+}
+
+async function salvarEtapa5() {
+  const banco = document.getElementById('e5-banco').value
+  const agencia = document.getElementById('e5-agencia').value.trim()
+  const conta = document.getElementById('e5-conta').value.trim()
+  const tipo = document.getElementById('e5-tipo').value
+  if (!banco || !agencia || !conta || !tipo) { toast('Preencha todos os campos bancários.', 'warning'); return }
+  const [bancoCod, bancoNome] = banco.split('|')
+  await autoSave({ banco_codigo: bancoCod, banco_nome: bancoNome, agencia, conta, conta_tipo: tipo, etapa_atual: 6 })
+  renderEtapa(6)
+}
+
+// ── ETAPA 6: Dependentes ──
+async function renderEtapa6(container) {
+  // Carregar dependentes do banco se não tiver em memória
+  if (!APP.dependentes.length && APP.colaboradorId) {
+    try {
+      const { data: deps } = await sb.from('dependentes').select('*').eq('colaborador_id', APP.colaboradorId).order('ordem')
+      if (deps && deps.length > 0) APP.dependentes = deps
+    } catch(e) { /* ignora, continua com vazio */ }
+  }
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 6 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Dependentes</h2>
+      <p style="font-size:13px;color:var(--gray500);">Adicione cônjuge, filhos ou outros dependentes (opcional).</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <div id="deps-list"></div>
+        <button class="btn btn-outline" onclick="adicionarDependente()">➕ Adicionar Dependente</button>
+        ${botoesNavegacao(6, 'salvarEtapa6()')}
+      </div>
+    </div>
+  </div>`
+  renderDepsList()
+}
+
+function renderDepsList() {
+  const list = document.getElementById('deps-list')
+  if (!list) return
+  list.innerHTML = APP.dependentes.map((dep, i) => `
+  <div class="dep-card">
+    <span class="dep-num">${i+1}</span>
+    <button class="dep-remove" onclick="removerDependente(${i})">✕</button>
+    <div class="input-group" style="margin-bottom:8px;">
+      <div class="field">
+        <label>Nome Completo *</label>
+        <input type="text" id="dep-${i}-nome" value="${dep.nome||''}" placeholder="Nome do dependente">
+      </div>
+      <div class="field">
+        <label>Parentesco *</label>
+        <select id="dep-${i}-parentesco">
+          <option value="">Selecione</option>
+          ${['Cônjuge','Filho(a)','Enteado(a)','Pai','Mãe','Outro'].map(p=>`<option value="${p}" ${dep.parentesco===p?'selected':''}>${p}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="input-group">
+      <div class="field">
+        <label>CPF</label>
+        <input type="text" id="dep-${i}-cpf" value="${dep.cpf||''}" placeholder="000.000.000-00" maxlength="14">
+      </div>
+      <div class="field">
+        <label>Data de Nascimento</label>
+        <input type="date" id="dep-${i}-nasc" value="${dep.data_nascimento||''}">
+      </div>
+    </div>
+  </div>`).join('')
+  APP.dependentes.forEach((_, i) => applyMask(document.getElementById(`dep-${i}-cpf`), 'cpf'))
+}
+
+function adicionarDependente() { APP.dependentes.push({}); renderDepsList() }
+function removerDependente(i) { APP.dependentes.splice(i, 1); renderDepsList() }
+
+async function salvarEtapa6() {
+  // Coletar dados dos dependentes do DOM
+  APP.dependentes = APP.dependentes.map((_, i) => ({
+    nome: document.getElementById(`dep-${i}-nome`)?.value || '',
+    parentesco: document.getElementById(`dep-${i}-parentesco`)?.value || '',
+    cpf: document.getElementById(`dep-${i}-cpf`)?.value || '',
+    data_nascimento: document.getElementById(`dep-${i}-nasc`)?.value || null,
+  })).filter(d => d.nome)
+
+  if (APP.colaboradorId && APP.dependentes.length > 0) {
+    await sb.from('dependentes').delete().eq('colaborador_id', APP.colaboradorId)
+    await sb.from('dependentes').insert(APP.dependentes.map((d,i) => ({ ...d, colaborador_id: APP.colaboradorId, ordem: i })))
+  }
+  await autoSave({ etapa_atual: 7 })
+  renderEtapa(7)
+}
+
+// ── ETAPA 7: Foto ──
+function renderEtapa7(container) {
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 7 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Foto do Colaborador</h2>
+      <p style="font-size:13px;color:var(--gray500);">Será utilizada para crachá e cadastro interno.</p>
+    </div>
+    <div class="card">
+      <div class="card-body" style="text-align:center;">
+        <div id="foto-preview-wrap" style="margin-bottom:16px;">
+          ${APP.dadosCandidato.foto_url ?
+            `<img src="${APP.dadosCandidato.foto_url}" class="photo-preview" id="foto-preview">` :
+            `<div style="width:120px;height:150px;background:var(--gray100);border-radius:8px;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:48px;border:2px dashed var(--gray300);">👤</div>`
+          }
+        </div>
+        <input type="file" id="foto-input" accept="image/*" capture="user" style="display:none" onchange="previewFoto(event)">
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-outline" onclick="document.getElementById('foto-input').click()">📷 Tirar Foto / Galeria</button>
+          ${APP.dadosCandidato.foto_url ? `<button class="btn btn-ghost" onclick="removerFoto()">✕ Remover</button>` : ''}
+        </div>
+        <p style="font-size:11px;color:var(--gray400);margin-top:12px;">Foto frente, boa iluminação. JPG ou PNG, máx. 10MB.</p>
+        ${botoesNavegacao(7, 'salvarEtapa7()')}
+      </div>
+    </div>
+  </div>`
+}
+
+function previewFoto(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = ev => {
+    const wrap = document.getElementById('foto-preview-wrap')
+    wrap.innerHTML = `<img src="${ev.target.result}" class="photo-preview" id="foto-preview">`
+    APP._fotoFile = file
+    toast('Foto carregada!', 'success')
+  }
+  reader.readAsDataURL(file)
+}
+
+function removerFoto() { APP._fotoFile = null; APP.dadosCandidato.foto_url = null; renderEtapa7(document.getElementById('cand-content')) }
+
+async function salvarEtapa7() {
+  if (APP._fotoFile && APP.colaboradorId) {
+    const btn = document.getElementById('btn-avancar-7')
+    if (btn) { btn.disabled = true; btn.textContent = 'Enviando foto...' }
+    try {
+      const fileComprimido = await comprimirImagem(APP._fotoFile, 800, 0.85)
+      const path = `${APP.conviteAtual.id}/foto_perfil.jpg`
+      const { error } = await sb.storage.from('admissoes').upload(path, fileComprimido, { upsert: true, contentType: 'image/jpeg' })
+      if (error) throw error
+      // Armazenar path, não URL pública
+      await autoSave({ foto_path: path, etapa_atual: 8 })
+    } catch(e) {
+      toast('Erro ao enviar foto: ' + e.message, 'error')
+      if (btn) { btn.disabled = false; btn.textContent = 'Salvar e Continuar →' }
+      return
+    }
+  } else {
+    await autoSave({ etapa_atual: 8 })
+  }
+  renderEtapa(8)
+}
+
+// ── ETAPA 8: Documentos ──
+const DOC_TIPOS = {
+  pessoal: [
+    { key:'rg', label:'RG (frente e verso)', required: true },
+    { key:'cpf', label:'CPF', required: true },
+    { key:'ctps', label:'Carteira de Trabalho (CTPS)', required: true },
+    { key:'titulo_eleitor', label:'Título de Eleitor', required: false },
+    { key:'reservista', label:'Certificado de Reservista', required: false },
+    { key:'comp_residencia', label:'Comprovante de Residência', required: true },
+    { key:'cartao_banco', label:'Cartão / Comprovante Bancário', required: true },
+    { key:'foto_3x4', label:'Foto 3×4', required: false },
+  ],
+  dependente: [
+    { key:'rg_dep', label:'RG do Dependente', required: false },
+    { key:'cpf_dep', label:'CPF do Dependente', required: false },
+    { key:'cert_nasc', label:'Certidão de Nascimento/Casamento', required: false },
+  ]
+}
+
+async function renderEtapa8(container) {
+  // Recarregar docs do banco sempre (garante estado atualizado)
+  if (APP.colaboradorId) {
+    try {
+      const { data: docsAtuais } = await sb.from('documentos').select('*').eq('colaborador_id', APP.colaboradorId)
+      if (docsAtuais) APP.dadosCandidato.documentos = docsAtuais
+    } catch(e) { /* continua com cache */ }
+  }
+  const uploadedDocs = APP.dadosCandidato.documentos || []
+  const uploadMap = {}
+  uploadedDocs.forEach(d => { uploadMap[d.tipo] = d })
+
+  const renderDocSection = (titulo, tipos) => `
+  <div style="margin-bottom:24px;">
+    <div class="section-title">${titulo}</div>
+    <div class="doc-checklist">
+      ${tipos.map(t => {
+        const uploaded = uploadMap[t.key]
+        return `<div class="doc-item ${uploaded ? 'done' : ''}">
+          <span class="doc-check">${uploaded ? '✓' : '○'}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:12px;">${t.label} ${t.required ? '*' : ''}</div>
+            ${uploaded ? `<div style="font-size:10px;">Enviado</div>` : `
+              <input type="file" id="upload-${t.key}" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="uploadDoc('${t.key}', '${t.required ? 'pessoal' : 'dependente'}', event)">
+              <button class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:10px;margin-top:3px;" onclick="document.getElementById('upload-${t.key}').click()">Enviar</button>
+            `}
+          </div>
+        </div>`
+      }).join('')}
+    </div>
+  </div>`
+
+  container.innerHTML = `
+  <div class="form-container">
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Etapa 8 de 8</div>
+      <h2 style="font-size:20px;font-weight:700;color:var(--navy);">Envio de Documentos</h2>
+      <p style="font-size:13px;color:var(--gray500);">Envie PDF, JPG ou PNG (máx. 10MB por arquivo).</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        ${renderDocSection('📋 Documentos Pessoais', DOC_TIPOS.pessoal)}
+        ${APP.dependentes.length > 0 ? renderDocSection('👶 Documentos dos Dependentes', DOC_TIPOS.dependente) : ''}
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--radius);padding:12px 14px;margin-bottom:16px;font-size:12px;color:#1E40AF;">
+          <b>ℹ️ Dica:</b> Você pode tirar fotos dos documentos diretamente pelo celular. Certifique-se de que estejam legíveis e sem reflexo.
+        </div>
+        <div id="upload-progress" style="display:none;margin-bottom:12px;"></div>
+        ${botoesNavegacao(8, 'finalizarAdmissao()')}
+      </div>
+    </div>
+  </div>`
+}
+
+// ── Retry para operações instáveis ──
+async function retryOp(fn, retries = 3, delay = 1500) {
+  for (let i = 0; i < retries; i++) {
+    try { return await fn() }
+    catch(e) { if (i === retries - 1) throw e; await new Promise(r => setTimeout(r, delay * (i + 1))) }
+  }
+}
+
+// ── Compressão automática de imagens ──
+async function comprimirImagem(file, maxWidth = 1600, quality = 0.82) {
+  if (!file.type.startsWith('image/') || file.type === 'application/pdf') return file
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      let { width, height } = img
+      if (width <= maxWidth && file.size < 500 * 1024) { resolve(file); return }
+      if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth }
+      const canvas = document.createElement('canvas')
+      canvas.width = width; canvas.height = height
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+      canvas.toBlob(blob => {
+        if (blob && blob.size < file.size) {
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+        } else { resolve(file) }
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = () => resolve(file)
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+async function uploadDoc(tipo, categoria, event) {
+  const fileOrig = event.target.files[0]; if (!fileOrig) return
+  if (fileOrig.size > 20 * 1024 * 1024) { toast('Arquivo muito grande (máx. 20MB).', 'error'); return }
+  const allowedTypes = ['image/jpeg','image/jpg','image/png','application/pdf']
+  if (!allowedTypes.includes(fileOrig.type)) { toast('Tipo inválido. Use PDF, JPG ou PNG.', 'error'); return }
+  if (!APP.colaboradorId) { toast('Salve os dados anteriores antes de enviar documentos.', 'warning'); return }
+
+  const inputEl = document.getElementById(`upload-${tipo}`)
+  const btnEl = inputEl ? inputEl.nextElementSibling : null
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '⏳ Enviando...' }
+  toast('Comprimindo e enviando...', 'info')
+
+  try {
+    const file = await comprimirImagem(fileOrig)
+    const ext = file.type === 'application/pdf' ? 'pdf' : 'jpg'
+    const path = `${APP.conviteAtual.id}/${tipo}_${Date.now()}.${ext}`
+
+    await retryOp(async () => {
+      const { error } = await sb.storage.from('admissoes').upload(path, file, { upsert: true, contentType: file.type })
+      if (error) throw error
+    })
+
+    // Upsert no banco (permite reenvio de documento)
+    const { data: docExist } = await sb.from('documentos')
+      .select('id').eq('colaborador_id', APP.colaboradorId).eq('tipo', tipo).maybeSingle()
+    if (docExist) {
+      await sb.from('documentos').update({
+        storage_path: path, nome_arquivo: fileOrig.name, mime_type: file.type,
+        tamanho_bytes: file.size, status: 'pendente', motivo_reprovacao: null,
+      }).eq('id', docExist.id)
+    } else {
+      await sb.from('documentos').insert({
+        colaborador_id: APP.colaboradorId, tipo, categoria,
+        nome_arquivo: fileOrig.name, storage_path: path,
+        mime_type: file.type, tamanho_bytes: file.size,
+      })
+    }
+    toast(`Documento enviado com sucesso!`, 'success')
+    const { data: docs } = await sb.from('documentos').select('*').eq('colaborador_id', APP.colaboradorId)
+    APP.dadosCandidato.documentos = docs
+    renderEtapa(8)
+  } catch(e) {
+    toast('Erro no upload: ' + (e.message || 'Verifique sua conexão'), 'error')
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = '📎 Enviar' }
+  }
+}
+
+async function finalizarAdmissao() {
+  const btn = document.getElementById('btn-avancar-8')
+  btn.disabled = true; btn.textContent = 'Finalizando...'
+  try {
+    await autoSave({ etapa_atual: 8 })
+    await sb.from('convites').update({ status: 'em_analise', finalizado_em: new Date().toISOString() }).eq('id', APP.conviteAtual.id)
+
+    // Tela de sucesso
+    const protocolo = gerarProtocolo()
+    document.getElementById('stepper-container').style.opacity = '0.3'
+    document.getElementById('cand-content').innerHTML = `
+    <div class="success-wrap fade-in">
+      <div class="success-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </div>
+      <h2>Documentação Enviada!</h2>
+      <p>Sua documentação foi enviada com sucesso ao departamento de RH. Em breve você receberá o retorno.</p>
+      <div class="protocol-box">
+        <div>
+          <div class="p-label">Protocolo</div>
+          <div class="p-code">${protocolo}</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--gray400);margin-top:8px;">Guarde este número para referência futura.</p>
+    </div>`
+  } catch(e) {
+    toast('Erro ao finalizar: ' + e.message, 'error')
+    btn.disabled = false; btn.textContent = 'Enviar Documentação ✓'
+  }
+}
+
+// ── Auto Save com proteção race condition ──
+let _autoSaveInProgress = false
+async function autoSave(dados) {
+  Object.assign(APP.dadosCandidato, dados)
+  if (_autoSaveInProgress) return
+  _autoSaveInProgress = true
+  try {
+    if (APP.colaboradorId) {
+      const { error } = await sb.from('colaboradores').update({ ...dados, updated_at: new Date().toISOString() }).eq('id', APP.colaboradorId)
+      if (error) throw error
+    } else {
+      // Verificar se já existe antes de inserir (evitar duplicata em reconexão)
+      const { data: existing } = await sb.from('colaboradores').select('id').eq('convite_id', APP.conviteAtual.id).maybeSingle()
+      if (existing) {
+        APP.colaboradorId = existing.id
+        await sb.from('colaboradores').update({ ...dados, updated_at: new Date().toISOString() }).eq('id', existing.id)
+      } else {
+        const insertData = {}
+        Object.keys(APP.dadosCandidato).forEach(k => { if (APP.dadosCandidato[k] !== null && APP.dadosCandidato[k] !== undefined && k !== 'documentos' && k !== 'dependentes') insertData[k] = APP.dadosCandidato[k] })
+        insertData.convite_id = APP.conviteAtual.id
+        const { data, error } = await sb.from('colaboradores').insert(insertData).select().single()
+        if (!error && data) { APP.colaboradorId = data.id }
+      }
+    }
+  } catch(e) {
+    console.error('AutoSave error:', e)
+    toast('Erro ao salvar progresso. Verifique sua conexão.', 'warning')
+  } finally {
+    _autoSaveInProgress = false
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+// ROTEAMENTO
+// ════════════════════════════════════════════════════════════════
+
+function handleRoute() {
+  const hash = window.location.hash
+  if (hash.startsWith('#/admissao/')) {
+    const token = hash.replace('#/admissao/', '')
+    if (token) {
+      if (APP.user) { showPage('app-layout'); return } // RH vendo link
+      initCandidato(token)
+      return
+    }
+  }
+}
+
+window.addEventListener('hashchange', handleRoute)
+
+// ── Monitor de conexão ──
+window.addEventListener('online',  () => toast('Conexão restabelecida!', 'success'))
+window.addEventListener('offline', () => toast('Sem conexão. Os dados serão salvos quando a conexão voltar.', 'warning'))
+
+// ── Timeout de segurança: se loading não sair em 12s, mostrar erro ──
+const _loadTimeout = setTimeout(() => {
+  const el = document.getElementById('app-loading')
+  if (el && el.style.display !== 'none' && el.style.opacity !== '0') {
+    el.innerHTML = '<div style="color:white;text-align:center;padding:40px;"><div style="font-size:48px;margin-bottom:16px;">⏱️</div><div style="font-size:16px;font-weight:600;">Tempo esgotado</div><div style="font-size:13px;opacity:.7;margin-top:8px;">Não foi possível conectar. Verifique sua internet.</div><button onclick="location.reload()" style="margin-top:20px;padding:10px 24px;background:#C9A84C;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;">Tentar novamente</button></div>'
+  }
+}, 12000)
+
+// ── INIT ──
+initAuth().then(() => clearTimeout(_loadTimeout))
+</script>
+</body>
+</html>
